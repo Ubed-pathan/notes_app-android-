@@ -1,15 +1,89 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# =============
+# Dependencies
+# =============
 node_modules/
+.pnp/
+.pnp.cjs
+.pnp.loader.mjs
+.pnp.data.json
 
-# Expo
+# ======
+# Logs
+# ======
+logs/
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==========
+# OS files
+# ==========
+.DS_Store
+Thumbs.db
+*.pem
+
+# =================
+# Environment files
+# =================
+# Commit an example (e.g. .env.example) instead
+.env
+.env.*
+.env*.local
+!.env.example
+
+# =================
+# Expo / Metro / CI
+# =================
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
+.metro-health-check*
+.metro-cache/
+.cache/
+tmp/
+.temp/
 
-# Native
+# =====================
+# React Native - Android
+# =====================
+android/app/build/
+android/.gradle/
+android/.cxx/
+android/local.properties
+android/*.iml
+android/*.keystore
+.gradle/
+
+# Android release artifacts
+android/app/release/*.apk
+android/app/release/*.aab
+android/app/debug/*.apk
+
+# =================
+# React Native - iOS
+# =================
+ios/build/
+ios/Pods/
+ios/*.xcworkspace
+ios/*.xcodeproj/project.xcworkspace
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/*.pbxuser
+ios/*.xcodeproj/*.mode1v3
+ios/*.xcodeproj/*.mode2v3
+ios/*.xcodeproj/*.perspectivev3
+*.xcuserstate
+DerivedData/
+
+# ================
+# Native security
+# ================
 .kotlin/
 *.orig.*
 *.jks
@@ -18,24 +92,34 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
-# Metro
-.metro-health-check*
+# =====================
+# IDEs and editors
+# =====================
+.vscode/
+.idea/
+*.iml
+.project
+.classpath
+.settings/
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# =======================
+# Testing / Coverage
+# =======================
+coverage/
+.nyc_output/
 
-# macOS
-.DS_Store
-*.pem
+# ================================
+# EAS (Expo Application Services)
+# ================================
+.eas/
+!eas.json
 
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-# generated native folders
+# =========================
+# Generated native folders
+# (Keep ignored if using Expo managed; remove these if committing native projects)
+# =========================
 /ios
 /android
+
+
+.keystore

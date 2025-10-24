@@ -1,30 +1,38 @@
 {
   "expo": {
-    "name": "Notes-app-reactnative",
-    "slug": "Notes-app-reactnative",
+    "name": "Al Kitab",
+    "slug": "al-kitab",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "icon": "./assets/icon-1024.png",
+    "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon-1024.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "plugins": [
+      "expo-router"
+    ],
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon-1024.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "com.notesapp.localnotes"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/icon-1024.png"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b31f5a2d-ce09-4ab1-9931-db5daf63484e"
+      }
+    },
+    "owner": "ubed"
   }
 }
