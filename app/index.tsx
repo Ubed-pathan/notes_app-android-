@@ -1,11 +1,11 @@
 import { Link, useRouter, useFocusEffect } from 'expo-router';
-import { View } from 'react-native';
+import { View, NativeSyntheticEvent, NativeScrollEvent, Pressable } from 'react-native';
 import { Appbar, FAB, Searchbar, Text, useTheme } from 'react-native-paper';
 import { FlashList } from '@shopify/flash-list';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
-import { Note, listNotes, deleteNote, togglePin } from '../src/storage/notes';
+import { Note, listNotes, deleteNote, togglePin, setPrivate } from '../src/storage/notes';
 import { NoteCard } from '../src/components/NoteCard';
 
 export default function NotesScreen() {
@@ -13,9 +13,11 @@ export default function NotesScreen() {
   const theme = useTheme();
   const [q, setQ] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
+  const [triggeredPrivate, setTriggeredPrivate] = useState(false);
+  const hasScrolledRef = useRef(false);
 
   const load = useCallback(async () => {
-    const data = await listNotes({ query: q });
+    const data = await listNotes({ query: q, onlyPublic: true });
     setNotes(data);
   }, [q]);
 
@@ -44,19 +46,54 @@ export default function NotesScreen() {
     load();
   };
 
+  const onTogglePrivate = async (id: string) => {
+    const n = notes.find(n => n.id === id);
+    await setPrivate(id, !n?.isPrivate);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    load();
+  };
+
   const renderItem = useCallback(({ item }: { item: Note }) => (
     <NoteCard
       note={item}
       onDelete={() => onDelete(item.id)}
       onTogglePin={() => onTogglePin(item.id)}
+      onTogglePrivate={() => onTogglePrivate(item.id)}
       onPress={() => router.push({ pathname: '/note', params: { id: item.id } })}
     />
   ), [router]);
 
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    if (y > 50) hasScrolledRef.current = true;
+    if (!triggeredPrivate && y > 300) {
+      setTriggeredPrivate(true);
+      router.push('/private/notes');
+    }
+  };
+
+  const onEndReached = () => {
+    if (triggeredPrivate) return;
+    if (!hasScrolledRef.current) return; // require some scroll first
+    setTriggeredPrivate(true);
+    router.push('/private/notes');
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <Appbar.Header>
-        <Appbar.Content title={'Al Kitab'} />
+        <Appbar.Content
+          title={
+            <Pressable onLongPress={() => router.push('/private/notes')}>
+              <Text
+                variant="titleLarge"
+                style={{ fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}
+              >
+                AL-KITAB
+              </Text>
+            </Pressable>
+          }
+        />
         <Appbar.Action icon="cog" onPress={() => router.push('/settings')} />
       </Appbar.Header>
       <Searchbar
@@ -68,17 +105,22 @@ export default function NotesScreen() {
       />
 
       <View style={{ flex: 1, paddingHorizontal: 12, paddingTop: 12 }}>
-  {/* Single vertical list: pinned notes already appear first */}
-        <FlashList
-          data={sorted}
-          renderItem={renderItem}
-          keyExtractor={(i) => i.id}
-          numColumns={1}
-          contentContainerStyle={{ paddingBottom: 96 }}
-        />
-        {sorted.length === 0 && (
-          <View style={{ alignItems: 'center', marginTop: 48 }}>
-            <Text variant="bodyMedium" style={{ opacity: 0.6 }}>No notes yet. Tap + to create one.</Text>
+        {sorted.length > 0 ? (
+          <FlashList
+            data={sorted}
+            renderItem={renderItem}
+            keyExtractor={(i) => i.id}
+            numColumns={1}
+            onScroll={onScroll}
+            onEndReached={onEndReached}
+            onEndReachedThreshold={0.2}
+            contentContainerStyle={{ paddingBottom: 96 }}
+          />
+        ) : (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 96 }}>
+            <Text variant="bodyMedium" style={{ opacity: 0.6, textAlign: 'center' }}>
+              No notes yet. Tap + to create one.
+            </Text>
           </View>
         )}
       </View>

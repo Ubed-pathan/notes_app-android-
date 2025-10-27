@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { Card, IconButton, Text, useTheme } from 'react-native-paper';
+import { memo, useState } from 'react';
+import { Card, IconButton, Menu, Text, useTheme } from 'react-native-paper';
 import { View } from 'react-native';
 import { Note } from '../storage/notes';
 
@@ -8,10 +8,12 @@ type Props = {
   onPress?: () => void;
   onDelete?: () => void;
   onTogglePin?: () => void;
+  onTogglePrivate?: () => void;
 };
 
-export const NoteCard = memo(function NoteCard({ note, onPress, onDelete, onTogglePin }: Props) {
+export const NoteCard = memo(function NoteCard({ note, onPress, onDelete, onTogglePin, onTogglePrivate }: Props) {
   const theme = useTheme();
+  const [menuVisible, setMenuVisible] = useState(false);
   const bg = note.pinned
     ? (theme.isV3 ? theme.colors.secondaryContainer : theme.colors.backdrop)
     : (theme.isV3 ? theme.colors.surfaceVariant : theme.colors.surface);
@@ -42,10 +44,27 @@ export const NoteCard = memo(function NoteCard({ note, onPress, onDelete, onTogg
         title={note.title || 'Untitled'}
         subtitle={subtitle}
         right={(props) => (
-        <>
-          <IconButton {...props} icon={note.pinned ? 'pin' : 'pin-outline'} onPress={onTogglePin} />
-          <IconButton {...props} icon="delete" onPress={onDelete} />
-        </>
+          <Menu
+            visible={menuVisible}
+            onDismiss={() => setMenuVisible(false)}
+            anchor={<IconButton {...props} icon="dots-vertical" onPress={() => setMenuVisible(true)} />}
+          >
+            <Menu.Item
+              onPress={() => { setMenuVisible(false); onTogglePrivate && onTogglePrivate(); }}
+              title={note.isPrivate ? 'Make public' : 'Make private'}
+              leadingIcon={note.isPrivate ? 'lock-open-variant' : 'lock'}
+            />
+            <Menu.Item
+              onPress={() => { setMenuVisible(false); onTogglePin && onTogglePin(); }}
+              title={note.pinned ? 'Unpin' : 'Pin'}
+              leadingIcon={note.pinned ? 'pin-off' : 'pin-outline'}
+            />
+            <Menu.Item
+              onPress={() => { setMenuVisible(false); onDelete && onDelete(); }}
+              title="Delete"
+              leadingIcon="delete"
+            />
+          </Menu>
         )}
       />
       {note.content ? (

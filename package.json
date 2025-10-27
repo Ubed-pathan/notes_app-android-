@@ -11,10 +11,12 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@shopify/flash-list": "2.0.2",
-    "expo": "~54.0.19",
+  "expo": "~54.0.20",
+  "expo-crypto": "~15.0.7",
     "expo-constants": "~18.0.10",
     "expo-haptics": "^15.0.7",
     "expo-linking": "~8.0.8",
+  "expo-secure-store": "~15.0.7",
     "expo-router": "^6.0.13",
     "expo-status-bar": "~3.0.8",
     "nanoid": "^5.1.6",

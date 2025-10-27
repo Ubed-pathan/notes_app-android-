@@ -8,6 +8,9 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { mode, setMode } = useAppTheme();
   const theme = useTheme();
+  const rawName = (Constants?.expoConfig?.name || 'Al Kitab').toUpperCase();
+  const parts = rawName.trim().split(/\s+/);
+  const displayName = parts.length > 1 ? `${parts[0]}-${parts.slice(1).join('')}` : rawName.replace(/\s+/g, '');
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <Appbar.Header>
@@ -47,7 +50,12 @@ export default function SettingsScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Avatar.Image size={48} source={require('../assets/icon-1024.png')} style={{ marginRight: 12 }} />
                 <View style={{ flex: 1 }}>
-                  <Text variant="titleMedium">{Constants?.expoConfig?.name || 'Al Kitab'}</Text>
+                  <Text
+                    variant="titleMedium"
+                    style={{ fontWeight: '800', letterSpacing: 2 }}
+                  >
+                    {displayName}
+                  </Text>
                   <Text variant="bodySmall" style={{ opacity: 0.8 }}>
                     This is a note app developed by <Text style={{ fontWeight: '600' }}>ubedullakhan pathan</Text>.
                   </Text>
