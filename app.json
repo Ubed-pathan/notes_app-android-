@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Al Kitab",
+    "name": "AL-KITAB",
     "slug": "al-kitab",
     "scheme": "al-kitab",
     "version": "1.0.0",
@@ -19,8 +19,9 @@
       "supportsTablet": true
     },
     "android": {
+      "icon": "./assets/android-legacy-icon.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon-1024.png",
+        "foregroundImage": "./assets/android-adaptive-foreground.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.notesapp.localnotes"

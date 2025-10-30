@@ -57,7 +57,7 @@ export default function SettingsScreen() {
                     {displayName}
                   </Text>
                   <Text variant="bodySmall" style={{ opacity: 0.8 }}>
-                    This is a note app developed by <Text style={{ fontWeight: '600' }}>ubedullakhan pathan</Text>.
+                    This is a note app developed by <Text style={{ fontWeight: '800' }}>Ubedullakhan Pathan</Text>.
                   </Text>
                   <Text variant="bodySmall" style={{ opacity: 0.6, marginTop: 2 }}>
                     v{Constants?.expoConfig?.version || Constants?.manifest?.version || '1.0.0'}
