@@ -19,6 +19,8 @@ async function generateAdaptiveForeground() {
   return out;
 }
 
+
+
 async function generateLegacyIcon() {
   const size = 1024; // px
   const scale = 0.8; // 80% content, 20% padding
