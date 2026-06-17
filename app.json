@@ -13,10 +13,22 @@
       "backgroundColor": "#ffffff"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon-1024.png",
+          "color": "#6750A4",
+          "defaultChannel": "reminders",
+          "sounds": []
+        }
+      ]
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "icon": "./assets/android-legacy-icon.png",
@@ -24,7 +36,14 @@
         "foregroundImage": "./assets/android-adaptive-foreground.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.notesapp.localnotes"
+      "package": "com.notesapp.localnotes",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM"
+      ]
     },
     "web": {
       "favicon": "./assets/icon-1024.png"

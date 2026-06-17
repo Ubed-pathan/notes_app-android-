@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { MD3DarkTheme, MD3LightTheme, Provider as PaperProvider } from 'react-native-paper';
+import { Provider as PaperProvider } from 'react-native-paper';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  DEFAULT_PALETTE,
+  ThemePalette,
+  PALETTE_STORAGE_KEY,
+  randomHex,
+} from '../features/theme/colorUtils';
+import { buildPaperTheme } from '../features/theme/buildPaperTheme';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -9,52 +16,42 @@ type ThemeContextValue = {
   mode: ThemeMode;
   setMode: (m: ThemeMode) => void;
   isDark: boolean;
+  palette: ThemePalette;
+  setPalette: (p: ThemePalette) => void;
+  randomizePalette: () => void;
+  resetPalette: () => void;
 };
 
 const THEME_MODE_KEY = 'theme.mode.v1';
 
-const ThemeContext = createContext<ThemeContextValue>({ mode: 'system', setMode: () => {}, isDark: false });
-
-const lightPalette = {
-  ...MD3LightTheme,
-  roundness: 12,
-  colors: {
-    ...MD3LightTheme.colors,
-    primary: '#6750A4',
-    secondary: '#625B71',
-    background: '#F8F7FB',
-    surface: '#FFFFFF',
-    surfaceVariant: '#F2EDF7',
-    outline: '#C4C7C5',
-    outlineVariant: '#E1E2E6',
-  },
-};
-
-const darkPalette = {
-  ...MD3DarkTheme,
-  roundness: 12,
-  colors: {
-    ...MD3DarkTheme.colors,
-    primary: '#CFBCFF',
-    secondary: '#CCC2DC',
-    background: '#121216',
-    surface: '#1B1B1F',
-    surfaceVariant: '#2A2831',
-    outline: '#8A8A8E',
-    outlineVariant: '#3A3A3F',
-  },
-};
+const ThemeContext = createContext<ThemeContextValue>({
+  mode: 'system',
+  setMode: () => {},
+  isDark: false,
+  palette: DEFAULT_PALETTE,
+  setPalette: () => {},
+  randomizePalette: () => {},
+  resetPalette: () => {},
+});
 
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
   const [mode, setModeState] = useState<ThemeMode>('system');
+  const [palette, setPaletteState] = useState<ThemePalette>(DEFAULT_PALETTE);
 
   useEffect(() => {
     (async () => {
       try {
-        const saved = await AsyncStorage.getItem(THEME_MODE_KEY);
-        if (saved === 'light' || saved === 'dark' || saved === 'system') {
-          setModeState(saved);
+        const savedMode = await AsyncStorage.getItem(THEME_MODE_KEY);
+        if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'system') {
+          setModeState(savedMode);
+        }
+        const savedPalette = await AsyncStorage.getItem(PALETTE_STORAGE_KEY);
+        if (savedPalette) {
+          const parsed = JSON.parse(savedPalette) as ThemePalette;
+          if (parsed.primary && parsed.accentSecondary && parsed.alertOptions) {
+            setPaletteState(parsed);
+          }
         }
       } catch {}
     })();
@@ -62,7 +59,29 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setMode = async (m: ThemeMode) => {
     setModeState(m);
-    try { await AsyncStorage.setItem(THEME_MODE_KEY, m); } catch {}
+    try {
+      await AsyncStorage.setItem(THEME_MODE_KEY, m);
+    } catch {}
+  };
+
+  const setPalette = async (p: ThemePalette) => {
+    setPaletteState(p);
+    try {
+      await AsyncStorage.setItem(PALETTE_STORAGE_KEY, JSON.stringify(p));
+    } catch {}
+  };
+
+  const randomizePalette = () => {
+    const next: ThemePalette = {
+      primary: randomHex(),
+      accentSecondary: randomHex(),
+      alertOptions: randomHex(),
+    };
+    setPalette(next);
+  };
+
+  const resetPalette = () => {
+    setPalette(DEFAULT_PALETTE);
   };
 
   const isDark = useMemo(() => {
@@ -70,9 +89,12 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     return mode === 'dark';
   }, [mode, system]);
 
-  const paperTheme = isDark ? (darkPalette as typeof MD3DarkTheme) : (lightPalette as typeof MD3LightTheme);
+  const paperTheme = useMemo(() => buildPaperTheme(isDark, palette), [isDark, palette]);
 
-  const ctx = useMemo(() => ({ mode, setMode, isDark }), [mode, isDark]);
+  const ctx = useMemo(
+    () => ({ mode, setMode, isDark, palette, setPalette, randomizePalette, resetPalette }),
+    [mode, isDark, palette]
+  );
 
   return (
     <ThemeContext.Provider value={ctx}>

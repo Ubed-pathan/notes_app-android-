@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { Appbar, Searchbar, Text, useTheme } from 'react-native-paper';
 import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
-import { Note, deleteNote, listNotes, setPrivate, togglePin } from '../../src/storage/notes';
+import { Note, deleteNote, listNotes, setPrivate, togglePin, toggleComplete } from '../../src/storage/notes';
 import { NoteCard } from '../../src/components/NoteCard';
 import { isConfigured } from '../../src/storage/private';
 
@@ -55,6 +55,12 @@ export default function PrivateNotesScreen() {
     load();
   };
 
+  const onToggleComplete = async (id: string) => {
+    await toggleComplete(id);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    load();
+  };
+
   const onTogglePrivate = async (id: string) => {
     await setPrivate(id, false); // moving back to public
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -83,6 +89,7 @@ export default function PrivateNotesScreen() {
                 onDelete={() => onDelete(item.id)}
                 onTogglePin={() => onTogglePin(item.id)}
                 onTogglePrivate={() => onTogglePrivate(item.id)}
+                onToggleComplete={() => onToggleComplete(item.id)}
                 onPress={() => router.push({ pathname: '/note', params: { id: item.id } })}
               />
             )}
