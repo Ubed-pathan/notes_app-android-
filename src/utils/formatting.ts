@@ -47,6 +47,59 @@ export function insertAtCursor(
   return { text: newText, selection: { start: pos, end: pos } };
 }
 
+function getLineInfo(plain: string, cursor: number) {
+  const lineStart = cursor === 0 ? 0 : plain.lastIndexOf('\n', cursor - 1) + 1;
+  const nextBreak = plain.indexOf('\n', cursor);
+  const lineEnd = nextBreak === -1 ? plain.length : nextBreak;
+  return {
+    lineStart,
+    lineEnd,
+    lineText: plain.slice(lineStart, lineEnd),
+    atLineStart: cursor === lineStart,
+    atLineEnd: cursor === lineEnd,
+  };
+}
+
+/** Insert bullet (-) or numbered (1.) list prefix at cursor — never replaces typed text */
+export function buildListPrefix(plain: string, cursor: number, type: 'bullet' | 'number'): string {
+  const { lineEnd, lineText, atLineStart, atLineEnd } = getLineInfo(plain, cursor);
+
+  if (type === 'bullet') {
+    if (/^-\s/.test(lineText)) {
+      if (atLineStart) return '';
+      if (atLineEnd) return '\n- ';
+      return '\n- ';
+    }
+    return atLineStart ? '- ' : '\n- ';
+  }
+
+  // Numbered list
+  if (/^\d+\.\s/.test(lineText)) {
+    if (atLineStart) return '';
+    const num = nextListNumber(plain, lineEnd);
+    return `\n${num}. `;
+  }
+
+  const num = nextListNumber(plain, cursor);
+  return atLineStart ? `${num}. ` : `\n${num}. `;
+}
+
+function nextListNumber(plain: string, cursor: number): number {
+  const lineStart = cursor === 0 ? 0 : plain.lastIndexOf('\n', cursor - 1) + 1;
+
+  if (lineStart > 0) {
+    const prevLineEnd = lineStart - 1;
+    const prevLineStart = plain.lastIndexOf('\n', prevLineEnd - 1) + 1;
+    const prevLine = plain.slice(prevLineStart, prevLineEnd);
+    const match = prevLine.match(/^(\d+)\.\s/);
+    if (match) return parseInt(match[1], 10) + 1;
+  }
+
+  const before = plain.slice(0, cursor);
+  const count = (before.match(/^\d+\.\s/gm) ?? []).length;
+  return count + 1;
+}
+
 /** Strip markdown for preview snippets */
 export function stripMarkdown(text: string): string {
   return text

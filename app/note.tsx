@@ -28,9 +28,8 @@ import * as Haptics from 'expo-haptics';
 import { nanoid } from 'nanoid/non-secure';
 import { ChecklistItem, deleteNote, getNote, upsertNote } from '../src/storage/notes';
 import { cancelNoteReminder, scheduleNoteReminder, reminderEnvironmentHint } from '../src/services/notifications';
-import { markdownToRich, richToMarkdown, toggleFormat, markerToFlag, updatePlainText } from '../src/utils/richText';
-import { insertAtCursor } from '../src/utils/formatting';
-import { FormattedNoteInput } from '../src/components/FormattedNoteInput';
+import { markerToFlag } from '../src/utils/richText';
+import { FormattedNoteInput, FormattedNoteInputHandle } from '../src/components/FormattedNoteInput';
 import { openDatePicker, openDateTimePicker } from '../src/utils/datePicker';
 
 export default function NoteScreen() {
@@ -38,7 +37,9 @@ export default function NoteScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [initialContent, setInitialContent] = useState('');
+  const contentRef = useRef('');
+  const contentInputRef = useRef<FormattedNoteInputHandle>(null);
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [reminderAt, setReminderAt] = useState<Date | null>(null);
@@ -48,7 +49,6 @@ export default function NoteScreen() {
   const [newCheckItem, setNewCheckItem] = useState('');
   const [showDuePicker, setShowDuePicker] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
-  const [selection, setSelection] = useState({ start: 0, end: 0 });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -57,7 +57,8 @@ export default function NoteScreen() {
       const n = await getNote(id);
       if (n) {
         setTitle(n.title);
-        setContent(n.content);
+        setInitialContent(n.content);
+        contentRef.current = n.content;
         setLoadedId(n.id);
         setDueDate(n.dueDate ? new Date(n.dueDate) : null);
         setReminderAt(n.reminderAt ? new Date(n.reminderAt) : null);
@@ -108,7 +109,7 @@ export default function NoteScreen() {
       const note = await upsertNote({
         id: loadedId,
         title: patch.title ?? title,
-        content: patch.content ?? content,
+        content: patch.content ?? contentRef.current,
         dueDate: patch.dueDate !== undefined ? (patch.dueDate?.getTime() ?? null) : (dueDate?.getTime() ?? null),
         reminderAt: patch.reminderAt !== undefined ? (patch.reminderAt?.getTime() ?? null) : (reminderAt?.getTime() ?? null),
         completed: patch.completed ?? completed,
@@ -129,7 +130,7 @@ export default function NoteScreen() {
       }
       return note;
     },
-    [loadedId, title, content, dueDate, reminderAt, completed, images, checklist, syncReminder]
+    [loadedId, title, dueDate, reminderAt, completed, images, checklist, syncReminder]
   );
 
   const debouncedSave = useCallback(
@@ -145,29 +146,27 @@ export default function NoteScreen() {
     debouncedSave({ title: t });
   };
 
-  const onChangeContent = (t: string) => {
-    setContent(t);
-    debouncedSave({ content: t });
-  };
+  const onMarkdownChange = useCallback(
+    (md: string) => {
+      contentRef.current = md;
+      debouncedSave({ content: md });
+    },
+    [debouncedSave]
+  );
 
   const applyFormat = (marker: string) => {
-    const rich = markdownToRich(content);
-    const updated = toggleFormat(rich, selection, markerToFlag(marker));
-    const md = richToMarkdown(updated);
-    setContent(md);
-    setSelection(selection);
-    debouncedSave({ content: md });
+    contentInputRef.current?.applyFormat(markerToFlag(marker));
     Haptics.selectionAsync();
   };
 
-  const insertBullet = () => {
-    const rich = markdownToRich(content);
-    const result = insertAtCursor(rich.plain, selection, '\n- ');
-    const updated = updatePlainText(rich, result.text);
-    const md = richToMarkdown(updated);
-    setContent(md);
-    setSelection(result.selection);
-    debouncedSave({ content: md });
+  const insertBulletList = () => {
+    contentInputRef.current?.insertList('bullet');
+    Haptics.selectionAsync();
+  };
+
+  const insertNumberList = () => {
+    contentInputRef.current?.insertList('number');
+    Haptics.selectionAsync();
   };
 
   const pickImage = async () => {
@@ -288,12 +287,13 @@ export default function NoteScreen() {
   const canDelete = useMemo(() => !!loadedId, [loadedId]);
 
   const formatTools = [
-    { icon: 'format-bold', action: () => applyFormat('**') },
-    { icon: 'format-italic', action: () => applyFormat('*') },
-    { icon: 'format-underline', action: () => applyFormat('__') },
-    { icon: 'format-strikethrough', action: () => applyFormat('~~') },
-    { icon: 'format-list-bulleted', action: insertBullet },
-    { icon: 'image', action: pickImage },
+    { icon: 'format-bold', action: () => applyFormat('**'), list: false },
+    { icon: 'format-italic', action: () => applyFormat('*'), list: false },
+    { icon: 'format-underline', action: () => applyFormat('__'), list: false },
+    { icon: 'format-strikethrough', action: () => applyFormat('~~'), list: false },
+    { icon: 'format-list-bulleted', action: insertBulletList, list: true },
+    { icon: 'format-list-numbered', action: insertNumberList, list: true },
+    { icon: 'image', action: pickImage, list: false },
   ] as const;
 
   return (
@@ -360,17 +360,26 @@ export default function NoteScreen() {
         ) : null}
 
         <Surface style={{ borderRadius: 16, marginBottom: 12, overflow: 'hidden', backgroundColor: theme.colors.surface }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 4, backgroundColor: theme.colors.surfaceVariant }}>
+          <View
+            style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 4, backgroundColor: theme.colors.surfaceVariant }}
+            onStartShouldSetResponder={() => true}
+          >
             {formatTools.map(t => (
-              <IconButton key={t.icon} icon={t.icon} size={20} onPress={t.action} />
+              <IconButton
+                key={t.icon}
+                icon={t.icon}
+                size={20}
+                onPressIn={t.list || t.icon === 'image' ? undefined : () => t.action()}
+                onPress={t.list || t.icon === 'image' ? t.action : undefined}
+              />
             ))}
           </View>
           <FormattedNoteInput
+            ref={contentInputRef}
+            key={loadedId ?? 'new-note'}
+            initialContent={initialContent}
+            onMarkdownChange={onMarkdownChange}
             placeholder="Write your note..."
-            value={content}
-            onChangeText={onChangeContent}
-            onSelectionChange={e => setSelection(e.nativeEvent.selection)}
-            selection={selection}
           />
         </Surface>
 

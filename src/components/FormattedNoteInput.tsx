@@ -1,16 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react';
 import {
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
-  View,
   TextInputProps,
   StyleProp,
   TextStyle,
 } from 'react-native';
 import { useTheme } from 'react-native-paper';
-import { markdownToRich, richToMarkdown, updatePlainText, RichContent, RichText } from '../utils/richText';
+import {
+  markdownToRich,
+  richToMarkdown,
+  updatePlainText,
+  toggleFormat,
+  RichContent,
+  RichSpan,
+  StyleFlags,
+  RichText,
+} from '../utils/richText';
+import { insertAtCursor, buildListPrefix } from '../utils/formatting';
 
 const INPUT_METRICS: TextStyle = {
   fontSize: 16,
@@ -21,106 +31,188 @@ const INPUT_METRICS: TextStyle = {
   ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
 };
 
+export type FormattedNoteInputHandle = {
+  applyFormat: (flag: keyof StyleFlags) => void;
+  insertList: (type: 'bullet' | 'number') => void;
+  getMarkdown: () => string;
+};
+
 type Props = Omit<TextInputProps, 'style' | 'value' | 'onChangeText'> & {
-  value: string;
-  onChangeText: (markdown: string) => void;
+  initialContent: string;
+  onMarkdownChange: (markdown: string) => void;
   style?: StyleProp<TextStyle>;
   minHeight?: number;
 };
 
-/**
- * Inline WYSIWYG editor.
- * TextInput holds plain text only (no ** markers).
- * RichText overlay draws bold/italic on top — same length, no marker bleed-through.
- */
-export function FormattedNoteInput({
-  value,
-  onChangeText,
-  onSelectionChange,
-  placeholder,
-  style,
-  minHeight = 180,
-  selection,
-  ...rest
-}: Props) {
+export const FormattedNoteInput = forwardRef<FormattedNoteInputHandle, Props>(function FormattedNoteInput(
+  { initialContent, onMarkdownChange, placeholder, style, minHeight = 180, ...rest },
+  ref
+) {
   const theme = useTheme();
+  const inputRef = useRef<TextInput>(null);
+  const [focused, setFocused] = useState(false);
   const [height, setHeight] = useState(minHeight);
   const flat = StyleSheet.flatten(style) ?? {};
-  const surfaceColor = theme.colors.surface;
   const textColor = theme.colors.onSurface;
-  const [rich, setRich] = useState<RichContent>(() => markdownToRich(value));
-  const lastMarkdown = useRef(value);
+  const [plain, setPlain] = useState(() => markdownToRich(initialContent).plain);
+  const [spans, setSpans] = useState<RichSpan[]>(() => markdownToRich(initialContent).spans);
+  const richRef = useRef<RichContent>(markdownToRich(initialContent));
+  const selectionRef = useRef({ start: 0, end: 0 });
+  const lastSelectionRef = useRef({ start: 0, end: 0 });
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedRef = useRef(initialContent);
+
+  const syncFromMarkdown = useCallback((markdown: string) => {
+    const next = markdownToRich(markdown);
+    richRef.current = next;
+    loadedRef.current = markdown;
+    setPlain(next.plain);
+    setSpans(next.spans);
+  }, []);
 
   useEffect(() => {
-    if (value !== lastMarkdown.current) {
-      lastMarkdown.current = value;
-      setRich(markdownToRich(value));
+    if (initialContent !== loadedRef.current) {
+      syncFromMarkdown(initialContent);
     }
-  }, [value]);
+  }, [initialContent, syncFromMarkdown]);
 
-  const onPlainChange = (plain: string) => {
-    const next = updatePlainText(rich, plain);
-    const md = richToMarkdown(next);
-    lastMarkdown.current = md;
-    setRich(next);
-    onChangeText(md);
-  };
+  const flushSave = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    const md = richToMarkdown(richRef.current);
+    loadedRef.current = md;
+    onMarkdownChange(md);
+  }, [onMarkdownChange]);
 
-  return (
-    <View style={{ minHeight: height, position: 'relative' }}>
+  const scheduleSave = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const md = richToMarkdown(richRef.current);
+      loadedRef.current = md;
+      onMarkdownChange(md);
+    }, 400);
+  }, [onMarkdownChange]);
+
+  const applyRich = useCallback(
+    (next: RichContent, saveNow = false) => {
+      richRef.current = next;
+      setPlain(next.plain);
+      setSpans(next.spans);
+      if (saveNow) flushSave();
+      else scheduleSave();
+    },
+    [flushSave, scheduleSave]
+  );
+
+  const getActiveSelection = useCallback(() => {
+    const cur = selectionRef.current;
+    if (cur.start !== cur.end) return cur;
+    return lastSelectionRef.current;
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      applyFormat(flag: keyof StyleFlags) {
+        const sel = getActiveSelection();
+        if (sel.start === sel.end) return;
+        const updated = toggleFormat(richRef.current, sel, flag);
+        applyRich(updated, true);
+        setFocused(false);
+      },
+      insertList(type: 'bullet' | 'number') {
+        const cursor = selectionRef.current.start;
+        const prefix = buildListPrefix(richRef.current.plain, cursor, type);
+        if (!prefix) return;
+        const result = insertAtCursor(richRef.current.plain, { start: cursor, end: cursor }, prefix);
+        const updated = updatePlainText(richRef.current, result.text);
+        selectionRef.current = result.selection;
+        applyRich(updated, true);
+        setFocused(true);
+        requestAnimationFrame(() => inputRef.current?.focus());
+      },
+      getMarkdown() {
+        return richToMarkdown(richRef.current);
+      },
+    }),
+    [applyRich, getActiveSelection]
+  );
+
+  const onPlainChange = useCallback(
+    (text: string) => {
+      const next = updatePlainText(richRef.current, text);
+      richRef.current = next;
+      setPlain(text);
+      setSpans(next.spans);
+      scheduleSave();
+    },
+    [scheduleSave]
+  );
+
+  const onSelectionChange = useCallback((start: number, end: number) => {
+    selectionRef.current = { start, end };
+    if (start !== end) lastSelectionRef.current = { start, end };
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    },
+    []
+  );
+
+  const inputStyle = [INPUT_METRICS, flat, { minHeight: height, color: textColor }];
+  const richContent: RichContent = { plain, spans };
+
+  if (focused) {
+    return (
       <TextInput
         {...rest}
-        value={rich.plain}
+        ref={inputRef}
+        value={plain}
         onChangeText={onPlainChange}
-        onSelectionChange={onSelectionChange}
+        onSelectionChange={e => onSelectionChange(e.nativeEvent.selection.start, e.nativeEvent.selection.end)}
         onContentSizeChange={e => {
           setHeight(Math.max(minHeight, e.nativeEvent.contentSize.height));
-          rest.onContentSizeChange?.(e);
         }}
-        selection={selection}
+        onBlur={() => {
+          setFocused(false);
+          flushSave();
+        }}
         multiline
+        autoFocus
         scrollEnabled={false}
         autoCorrect={false}
         spellCheck={false}
         autoCapitalize="sentences"
         disableFullscreenUI
-        placeholder=""
+        placeholder={placeholder}
+        placeholderTextColor={theme.colors.onSurfaceDisabled}
         selectionColor={theme.colors.primary + '66'}
         cursorColor={theme.colors.primary}
         underlineColorAndroid="transparent"
-        style={[
-          INPUT_METRICS,
-          flat,
-          {
-            minHeight: height,
-            color: surfaceColor,
-            backgroundColor: 'transparent',
-          },
-        ]}
+        style={inputStyle}
       />
+    );
+  }
 
-      <View
-        pointerEvents="none"
-        style={[
-          INPUT_METRICS,
-          flat,
-          {
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            minHeight: height,
-          },
-        ]}
-      >
-        {!rich.plain ? (
-          <Text style={{ fontSize: 16, lineHeight: 24, color: theme.colors.onSurfaceDisabled }}>
-            {placeholder}
-          </Text>
-        ) : (
-          <RichText content={rich} style={{ fontSize: 16, lineHeight: 24, color: textColor }} />
-        )}
-      </View>
-    </View>
+  return (
+    <Pressable onPress={() => setFocused(true)} style={[INPUT_METRICS, flat, { minHeight: height }]}>
+      {!plain ? (
+        <Text style={{ fontSize: 16, lineHeight: 24, color: theme.colors.onSurfaceDisabled }}>
+          {placeholder}
+        </Text>
+      ) : (
+        <RichText content={richContent} style={{ fontSize: 16, lineHeight: 24, color: textColor }} />
+      )}
+      <TextInput
+        ref={inputRef}
+        value={plain}
+        onChangeText={onPlainChange}
+        onFocus={() => setFocused(true)}
+        onSelectionChange={e => onSelectionChange(e.nativeEvent.selection.start, e.nativeEvent.selection.end)}
+        multiline
+        style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+      />
+    </Pressable>
   );
-}
+});

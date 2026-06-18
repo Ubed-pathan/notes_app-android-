@@ -1,10 +1,10 @@
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Checkbox, IconButton, Menu, Text, useTheme } from 'react-native-paper';
 import { Image, Pressable, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Note } from '../storage/notes';
 import { formatDueDate } from '../utils/formatting';
-import { MarkdownText } from '../utils/markdownRender';
+import { markdownToRich, RichText } from '../utils/richText';
 
 type Props = {
   note: Note;
@@ -80,7 +80,8 @@ export const NoteCard = memo(function NoteCard({
   const checklistTotal = checklist.length;
   const checklistPct = checklistTotal ? (checklistDone / checklistTotal) * 100 : 0;
 
-  const preview = note.content.trim();
+  const previewRich = useMemo(() => markdownToRich(note.content ?? ''), [note.content]);
+  const preview = previewRich.plain.trim();
   const images = note.images ?? [];
   const hasReminder = note.reminderAt != null && note.reminderAt > Date.now();
 
@@ -172,7 +173,8 @@ export const NoteCard = memo(function NoteCard({
             </View>
 
             {preview ? (
-              <MarkdownText
+              <RichText
+                content={previewRich}
                 numberOfLines={2}
                 style={{
                   marginTop: 6,
@@ -181,9 +183,7 @@ export const NoteCard = memo(function NoteCard({
                   color: theme.colors.onSurfaceVariant,
                   opacity: note.completed ? 0.55 : 0.85,
                 }}
-              >
-                {preview}
-              </MarkdownText>
+              />
             ) : null}
           </View>
 
