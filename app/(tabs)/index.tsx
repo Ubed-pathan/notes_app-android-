@@ -1,6 +1,6 @@
 import { useRouter, useFocusEffect } from 'expo-router';
 import { View, NativeSyntheticEvent, NativeScrollEvent, Pressable, ScrollView, Platform } from 'react-native';
-import { Appbar, FAB, Searchbar, Text, useTheme } from 'react-native-paper';
+import { FAB, Searchbar, Text, useTheme, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -8,6 +8,8 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import * as Haptics from 'expo-haptics';
 import { Note, listNotes, deleteNote, togglePin, setPrivate, toggleComplete, startOfDay as dayStart } from '../../src/storage/notes';
 import { NoteCard } from '../../src/components/NoteCard';
+import { Screen } from '../../src/components/Screen';
+import { AppTopBar } from '../../src/components/AppTopBar';
 import { openDatePicker } from '../../src/utils/datePicker';
 import { useScreenBottomInset } from '../../src/hooks/useScreenBottomInset';
 
@@ -142,19 +144,17 @@ export default function NotesScreen() {
       : 'By Date';
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <Appbar.Header elevated>
-        <Appbar.Content
-          title={
-            <Pressable onLongPress={() => router.push('/private/notes')}>
-              <Text variant="titleLarge" style={{ fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>
-                AL-KITAB
-              </Text>
-            </Pressable>
-          }
-        />
-        <Appbar.Action icon="cog" onPress={() => router.push('/settings')} />
-      </Appbar.Header>
+    <Screen style={{ backgroundColor: theme.colors.background }}>
+      <AppTopBar
+        title={
+          <Pressable onLongPress={() => router.push('/private/notes')}>
+            <Text variant="titleLarge" style={{ fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>
+              AL-KITAB
+            </Text>
+          </Pressable>
+        }
+        right={<IconButton icon="cog" onPress={() => router.push('/settings')} />}
+      />
 
       <Searchbar
         placeholder="Search notes & tasks..."
@@ -269,6 +269,6 @@ export default function NotesScreen() {
         onPress={() => router.push('/note')}
         label="New"
       />
-    </View>
+    </Screen>
   );
 }

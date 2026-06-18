@@ -6,6 +6,8 @@ import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { Note, listNotes, startOfDay, toggleComplete } from '../../src/storage/notes';
 import { NoteCard } from '../../src/components/NoteCard';
+import { Screen } from '../../src/components/Screen';
+import { AppTopBar } from '../../src/components/AppTopBar';
 import { useScreenBottomInset } from '../../src/hooks/useScreenBottomInset';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -82,10 +84,8 @@ export default function CalendarScreen() {
   const todayStart = startOfDay(Date.now());
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <Appbar.Header elevated>
-        <Appbar.Content title="Calendar" subtitle="Day-wise tasks" />
-      </Appbar.Header>
+    <Screen style={{ backgroundColor: theme.colors.background }}>
+      <AppTopBar title="Calendar" subtitle="Day-wise tasks" />
 
       <View style={{ margin: 12, padding: 16, borderRadius: 20, backgroundColor: theme.colors.surface, elevation: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -188,6 +188,6 @@ export default function CalendarScreen() {
           </View>
         )}
       </View>
-    </View>
+    </Screen>
   );
 }

@@ -1,5 +1,6 @@
 import { ReactNode, memo } from 'react';
 import { StyleSheet, Text, TextStyle, StyleProp } from 'react-native';
+import { normalizeNumberedLists } from './listNormalize';
 
 export type StyleFlags = {
   bold?: boolean;
@@ -146,7 +147,7 @@ function parseLine(line: string, offset: number): { plain: string; spans: RichSp
 export function markdownToRich(markdown: string): RichContent {
   if (!markdown) return { plain: '', spans: [] };
 
-  const lines = markdown.split('\n');
+  const lines = normalizeNumberedLists(markdown).split('\n');
   let plain = '';
   const spans: RichSpan[] = [];
 

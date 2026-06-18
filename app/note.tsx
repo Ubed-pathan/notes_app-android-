@@ -30,7 +30,35 @@ import { ChecklistItem, deleteNote, getNote, upsertNote } from '../src/storage/n
 import { cancelNoteReminder, scheduleNoteReminder, reminderEnvironmentHint } from '../src/services/notifications';
 import { markerToFlag } from '../src/utils/richText';
 import { FormattedNoteInput, FormattedNoteInputHandle } from '../src/components/FormattedNoteInput';
+import { ImageLightbox } from '../src/components/ImageLightbox';
 import { openDatePicker, openDateTimePicker } from '../src/utils/datePicker';
+
+function DismissibleChip({
+  icon,
+  label,
+  onPress,
+  onDismiss,
+  dismissible,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  onDismiss: () => void;
+  dismissible: boolean;
+}) {
+  return (
+    <Chip
+      icon={icon}
+      onPress={onPress}
+      onClose={dismissible ? onDismiss : undefined}
+      selected={dismissible}
+      showSelectedCheck={false}
+      style={{ borderRadius: 20 }}
+    >
+      {label}
+    </Chip>
+  );
+}
 
 export default function NoteScreen() {
   const router = useRouter();
@@ -45,6 +73,7 @@ export default function NoteScreen() {
   const [reminderAt, setReminderAt] = useState<Date | null>(null);
   const [completed, setCompleted] = useState(false);
   const [images, setImages] = useState<string[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [newCheckItem, setNewCheckItem] = useState('');
   const [showDuePicker, setShowDuePicker] = useState(false);
@@ -318,27 +347,30 @@ export default function NoteScreen() {
           outlineStyle={{ borderRadius: 12 }}
         />
 
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-          <Chip
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+          <DismissibleChip
             icon="calendar"
+            label={dueDate ? dueDate.toLocaleDateString() : 'Set due date'}
             onPress={pickDueDate}
-            style={{ borderRadius: 20 }}
-          >
-            {dueDate ? dueDate.toLocaleDateString() : 'Set due date'}
-          </Chip>
-          {dueDate ? (
-            <IconButton icon="close-circle" size={20} onPress={clearDueDate} />
-          ) : null}
-          <Chip
+            onDismiss={clearDueDate}
+            dismissible={!!dueDate}
+          />
+          <DismissibleChip
             icon="bell"
+            label={
+              reminderAt
+                ? reminderAt.toLocaleString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : 'Set reminder'
+            }
             onPress={pickReminder}
-            style={{ borderRadius: 20 }}
-          >
-            {reminderAt ? reminderAt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Set reminder'}
-          </Chip>
-          {reminderAt ? (
-            <IconButton icon="close-circle" size={20} onPress={clearReminder} />
-          ) : null}
+            onDismiss={clearReminder}
+            dismissible={!!reminderAt}
+          />
           {completed ? (
             <Chip icon="check" style={{ borderRadius: 20, backgroundColor: '#E8F5E9' }} textStyle={{ color: '#2E7D32' }}>
               Completed
@@ -369,8 +401,8 @@ export default function NoteScreen() {
                 key={t.icon}
                 icon={t.icon}
                 size={20}
-                onPressIn={t.list || t.icon === 'image' ? undefined : () => t.action()}
-                onPress={t.list || t.icon === 'image' ? t.action : undefined}
+                onPressIn={t.icon === 'image' ? undefined : () => t.action()}
+                onPress={t.icon === 'image' ? t.action : undefined}
               />
             ))}
           </View>
@@ -389,7 +421,9 @@ export default function NoteScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
               {images.map(uri => (
                 <View key={uri} style={{ position: 'relative' }}>
-                  <Image source={{ uri }} style={{ width: 120, height: 120, borderRadius: 12 }} />
+                  <Pressable onPress={() => setPreviewImage(uri)}>
+                    <Image source={{ uri }} style={{ width: 120, height: 120, borderRadius: 12 }} />
+                  </Pressable>
                   <Pressable
                     onPress={() => removeImage(uri)}
                     style={{
@@ -443,6 +477,7 @@ export default function NoteScreen() {
           </Button>
         </View>
       </ScrollView>
+      <ImageLightbox uri={previewImage} onClose={() => setPreviewImage(null)} />
     </KeyboardAvoidingView>
   );
 }

@@ -37,6 +37,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.notesapp.localnotes",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",

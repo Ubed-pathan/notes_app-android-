@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Note } from '../storage/notes';
 import { formatDueDate } from '../utils/formatting';
 import { markdownToRich, RichText } from '../utils/richText';
+import { ImageLightbox } from './ImageLightbox';
 
 type Props = {
   note: Note;
@@ -69,6 +70,7 @@ export const NoteCard = memo(function NoteCard({
 }: Props) {
   const theme = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const overdueDay =
     note.dueDate != null &&
@@ -98,6 +100,7 @@ export const NoteCard = memo(function NoteCard({
     : theme.colors.surface;
 
   return (
+    <>
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
@@ -226,8 +229,9 @@ export const NoteCard = memo(function NoteCard({
         {images.length > 0 ? (
           <View style={{ flexDirection: 'row', marginTop: 12, gap: 8 }}>
             {images.slice(0, 3).map((uri, i) => (
-              <View
+              <Pressable
                 key={uri}
+                onPress={() => setPreviewImage(uri)}
                 style={{
                   borderRadius: 10,
                   overflow: 'hidden',
@@ -248,7 +252,7 @@ export const NoteCard = memo(function NoteCard({
                     <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>+{images.length - 3}</Text>
                   </View>
                 ) : null}
-              </View>
+              </Pressable>
             ))}
           </View>
         ) : null}
@@ -294,8 +298,8 @@ export const NoteCard = memo(function NoteCard({
               <MetaTag
                 icon={overdueDay ? 'alert-circle' : 'calendar'}
                 label={formatDueDate(note.dueDate)}
-                color={overdueDay ? '#C62828' : theme.colors.primary}
-                bg={overdueDay ? '#FFEBEE' : theme.colors.primaryContainer}
+                color={overdueDay ? theme.colors.error : theme.colors.onSurfaceVariant}
+                bg={overdueDay ? theme.colors.errorContainer : theme.colors.surfaceVariant}
               />
             ) : null}
             {hasReminder ? (
@@ -337,5 +341,7 @@ export const NoteCard = memo(function NoteCard({
         </View>
       </View>
     </Pressable>
+    <ImageLightbox uri={previewImage} onClose={() => setPreviewImage(null)} />
+    </>
   );
 });

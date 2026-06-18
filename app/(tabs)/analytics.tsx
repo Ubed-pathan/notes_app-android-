@@ -1,10 +1,12 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { Appbar, Divider, ProgressBar, Surface, Text, useTheme } from 'react-native-paper';
+import { Divider, ProgressBar, Surface, Text, useTheme } from 'react-native-paper';
 import { getNoteStats, NoteStats } from '../../src/storage/notes';
 import { ProgressRing } from '../../src/components/ProgressRing';
 import { StatCard } from '../../src/components/StatCard';
+import { Screen } from '../../src/components/Screen';
+import { AppTopBar } from '../../src/components/AppTopBar';
 import { useScreenBottomInset } from '../../src/hooks/useScreenBottomInset';
 
 export default function AnalyticsScreen() {
@@ -24,10 +26,8 @@ export default function AnalyticsScreen() {
     stats && stats.checklistTotal > 0 ? Math.round((stats.checklistDone / stats.checklistTotal) * 100) : 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <Appbar.Header elevated>
-        <Appbar.Content title="Analytics" subtitle="Your productivity at a glance" />
-      </Appbar.Header>
+    <Screen style={{ backgroundColor: theme.colors.background }}>
+      <AppTopBar title="Analytics" subtitle="Your productivity at a glance" />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: scrollPaddingBottom }}>
         <Surface style={{ borderRadius: 24, padding: 24, alignItems: 'center', marginBottom: 16, backgroundColor: theme.colors.primaryContainer }}>
@@ -109,7 +109,7 @@ export default function AnalyticsScreen() {
           />
         </Surface>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 

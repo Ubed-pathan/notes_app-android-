@@ -60,44 +60,77 @@ function getLineInfo(plain: string, cursor: number) {
   };
 }
 
+function parseNumberedLine(lineText: string): { num: number; content: string } | null {
+  const match = lineText.match(/^(\d+)\.\s(.*)$/);
+  if (!match) return null;
+  return { num: parseInt(match[1], 10), content: match[2] };
+}
+
+/** Renumber consecutive list lines and strip duplicated prefixes (e.g. "1. 1. item" → "1. item") */
+export { normalizeNumberedLists } from './listNormalize';
+
+function nextListNumber(plain: string, cursor: number): number {
+  const { lineStart, lineText } = getLineInfo(plain, cursor);
+
+  const current = parseNumberedLine(lineText);
+  if (current) return current.num + 1;
+
+  if (lineStart > 0) {
+    const prevLineEnd = lineStart - 1;
+    const prevLineStart = plain.lastIndexOf('\n', prevLineEnd - 1) + 1;
+    const prev = parseNumberedLine(plain.slice(prevLineStart, prevLineEnd));
+    if (prev) return prev.num + 1;
+  }
+
+  const before = plain.slice(0, lineStart);
+  const count = (before.match(/^\d+\.\s/gm) ?? []).length;
+  return count + 1;
+}
+
 /** Insert bullet (-) or numbered (1.) list prefix at cursor — never replaces typed text */
 export function buildListPrefix(plain: string, cursor: number, type: 'bullet' | 'number'): string {
-  const { lineEnd, lineText, atLineStart, atLineEnd } = getLineInfo(plain, cursor);
+  const { lineText, atLineStart, atLineEnd } = getLineInfo(plain, cursor);
 
   if (type === 'bullet') {
     if (/^-\s/.test(lineText)) {
       if (atLineStart) return '';
-      if (atLineEnd) return '\n- ';
+      const content = lineText.slice(2);
+      if (atLineEnd && content.length === 0) return '';
       return '\n- ';
     }
     return atLineStart ? '- ' : '\n- ';
   }
 
-  // Numbered list
-  if (/^\d+\.\s/.test(lineText)) {
+  const numbered = parseNumberedLine(lineText);
+  if (numbered) {
     if (atLineStart) return '';
-    const num = nextListNumber(plain, lineEnd);
-    return `\n${num}. `;
+    if (atLineEnd && numbered.content.length === 0) return '';
+    return `\n${numbered.num + 1}. `;
   }
 
   const num = nextListNumber(plain, cursor);
   return atLineStart ? `${num}. ` : `\n${num}. `;
 }
 
-function nextListNumber(plain: string, cursor: number): number {
-  const lineStart = cursor === 0 ? 0 : plain.lastIndexOf('\n', cursor - 1) + 1;
+/** Resolve where to insert a list prefix (handles stale cursor at line start after toolbar tap) */
+export function resolveListInsert(
+  plain: string,
+  cursor: number,
+  type: 'bullet' | 'number'
+): { prefix: string; at: number } {
+  let at = cursor;
+  const info = getLineInfo(plain, cursor);
 
-  if (lineStart > 0) {
-    const prevLineEnd = lineStart - 1;
-    const prevLineStart = plain.lastIndexOf('\n', prevLineEnd - 1) + 1;
-    const prevLine = plain.slice(prevLineStart, prevLineEnd);
-    const match = prevLine.match(/^(\d+)\.\s/);
-    if (match) return parseInt(match[1], 10) + 1;
+  if (type === 'number') {
+    const numbered = parseNumberedLine(info.lineText);
+    if (numbered && info.atLineStart && numbered.content.length > 0) {
+      at = info.lineEnd;
+    }
+  } else if (/^-\s/.test(info.lineText) && info.atLineStart && info.lineText.length > 2) {
+    at = info.lineEnd;
   }
 
-  const before = plain.slice(0, cursor);
-  const count = (before.match(/^\d+\.\s/gm) ?? []).length;
-  return count + 1;
+  return { prefix: buildListPrefix(plain, at, type), at };
 }
 
 /** Strip markdown for preview snippets */

@@ -20,7 +20,7 @@ import {
   StyleFlags,
   RichText,
 } from '../utils/richText';
-import { insertAtCursor, buildListPrefix } from '../utils/formatting';
+import { insertAtCursor, resolveListInsert, normalizeNumberedLists } from '../utils/formatting';
 
 const INPUT_METRICS: TextStyle = {
   fontSize: 16,
@@ -59,6 +59,7 @@ export const FormattedNoteInput = forwardRef<FormattedNoteInputHandle, Props>(fu
   const richRef = useRef<RichContent>(markdownToRich(initialContent));
   const selectionRef = useRef({ start: 0, end: 0 });
   const lastSelectionRef = useRef({ start: 0, end: 0 });
+  const lastCursorRef = useRef(0);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedRef = useRef(initialContent);
 
@@ -120,12 +121,17 @@ export const FormattedNoteInput = forwardRef<FormattedNoteInputHandle, Props>(fu
         setFocused(false);
       },
       insertList(type: 'bullet' | 'number') {
-        const cursor = selectionRef.current.start;
-        const prefix = buildListPrefix(richRef.current.plain, cursor, type);
+        const cursor = lastCursorRef.current;
+        const { prefix, at } = resolveListInsert(richRef.current.plain, cursor, type);
         if (!prefix) return;
-        const result = insertAtCursor(richRef.current.plain, { start: cursor, end: cursor }, prefix);
-        const updated = updatePlainText(richRef.current, result.text);
-        selectionRef.current = result.selection;
+        const result = insertAtCursor(richRef.current.plain, { start: at, end: at }, prefix);
+        const normalizedPlain =
+          type === 'number' ? normalizeNumberedLists(result.text) : result.text;
+        const wasAtEnd = at >= richRef.current.plain.length;
+        const newCursor = wasAtEnd ? normalizedPlain.length : at + prefix.length;
+        lastCursorRef.current = newCursor;
+        const updated = updatePlainText(richRef.current, normalizedPlain);
+        selectionRef.current = { start: newCursor, end: newCursor };
         applyRich(updated, true);
         setFocused(true);
         requestAnimationFrame(() => inputRef.current?.focus());
@@ -150,6 +156,7 @@ export const FormattedNoteInput = forwardRef<FormattedNoteInputHandle, Props>(fu
 
   const onSelectionChange = useCallback((start: number, end: number) => {
     selectionRef.current = { start, end };
+    lastCursorRef.current = end;
     if (start !== end) lastSelectionRef.current = { start, end };
   }, []);
 
