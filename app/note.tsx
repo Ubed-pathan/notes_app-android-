@@ -80,6 +80,10 @@ export default function NoteScreen() {
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const checklistDone = checklist.filter(c => c.checked).length;
+  const checklistTotal = checklist.length;
+  const checklistPct = checklistTotal ? (checklistDone / checklistTotal) * 100 : 0;
+
   useEffect(() => {
     (async () => {
       if (!id) return;
@@ -119,7 +123,7 @@ export default function NoteScreen() {
     const hint = reminderEnvironmentHint();
     if (hint) {
       Alert.alert(
-        'Reminder scheduled',
+        'Alarm scheduled',
         `Alarm set for ${at.toLocaleString()}.\n\n${hint}`
       );
     }
@@ -446,9 +450,43 @@ export default function NoteScreen() {
         <Divider style={{ marginVertical: 8 }} />
 
         <Text variant="labelLarge" style={{ marginBottom: 8, fontWeight: '700' }}>Checklist</Text>
+        {checklistTotal > 0 ? (
+          <View style={{ marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text variant="labelSmall" style={{ fontWeight: '600', opacity: 0.7 }}>
+                Progress
+              </Text>
+              <Text variant="labelSmall" style={{ fontWeight: '700', opacity: 0.7 }}>
+                {checklistDone}/{checklistTotal}
+              </Text>
+            </View>
+            <View
+              style={{
+                height: 6,
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: 3,
+                overflow: 'hidden',
+              }}
+            >
+              <View
+                style={{
+                  width: `${checklistPct}%`,
+                  height: '100%',
+                  backgroundColor: checklistPct === 100 ? theme.colors.tertiary : theme.colors.outlineVariant,
+                  borderRadius: 3,
+                }}
+              />
+            </View>
+          </View>
+        ) : null}
         {checklist.map(item => (
           <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-            <Checkbox status={item.checked ? 'checked' : 'unchecked'} onPress={() => toggleCheckItem(item.id)} />
+            <Checkbox
+              status={item.checked ? 'checked' : 'unchecked'}
+              onPress={() => toggleCheckItem(item.id)}
+              color={theme.colors.tertiary}
+              uncheckedColor={theme.colors.outline}
+            />
             <Text
               style={{
                 flex: 1,

@@ -1,5 +1,8 @@
 import { Platform } from 'react-native';
 import { upsertNote, getNote, listNotes } from '../storage/notes';
+import { getAlarmToneId } from '../storage/reminderSettings';
+import { getAlarmTone, getNotificationSound, getReminderChannelId, shouldPlayFullAlarmInApp } from '../constants/alarmTones';
+import { playAlarmRingtone, stopAlarmRingtone } from './alarmPlayback';
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -41,13 +44,17 @@ async function getNotifications(): Promise<NotificationsModule | null> {
 
       if (!handlerConfigured) {
         Notifications.setNotificationHandler({
-          handleNotification: async () => ({
-            shouldShowAlert: true,
-            shouldPlaySound: true,
-            shouldSetBadge: true,
-            shouldShowBanner: true,
-            shouldShowList: true,
-          }),
+          handleNotification: async () => {
+            const toneId = await getAlarmToneId();
+            return {
+              shouldShowAlert: true,
+              shouldPlaySound: !shouldPlayFullAlarmInApp(toneId),
+              shouldSetBadge: true,
+              shouldShowBanner: true,
+              shouldShowList: true,
+              priority: Notifications.AndroidNotificationPriority.MAX,
+            };
+          },
         });
         handlerConfigured = true;
       }
@@ -80,20 +87,33 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   return requested.granted || requested.status === 'granted';
 }
 
-export async function setupAndroidChannel(): Promise<void> {
+export async function setupAndroidChannel(toneId?: import('../constants/alarmTones').AlarmToneId): Promise<string> {
   const Notifications = await getNotifications();
-  if (!Notifications || Platform.OS !== 'android') return;
+  if (!Notifications || Platform.OS !== 'android') return 'reminders-default';
 
-  await Notifications.setNotificationChannelAsync('reminders', {
-    name: 'Reminders',
+  const id = toneId ?? (await getAlarmToneId());
+  const tone = getAlarmTone(id);
+  const channelId = getReminderChannelId(id);
+  const sound = getNotificationSound(tone);
+  const channelLabel =
+    id === 'custom' ? 'Alarms · My tone' : id === 'default' ? 'Reminders' : `Alarms · ${tone.label}`;
+
+  await Notifications.setNotificationChannelAsync(channelId, {
+    name: channelLabel,
     description: 'Note reminder alarms',
     importance: Notifications.AndroidImportance.MAX,
-    sound: 'default',
-    vibrationPattern: [0, 400, 200, 400],
+    sound: typeof sound === 'string' ? sound : 'default',
+    vibrationPattern: [0, 600, 200, 600, 200, 600],
     enableVibrate: true,
-    bypassDnd: false,
+    bypassDnd: true,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    audioAttributes: {
+      usage: Notifications.AndroidAudioUsage.ALARM,
+      contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+    },
   });
+
+  return channelId;
 }
 
 export async function scheduleNoteReminder(
@@ -114,8 +134,6 @@ export async function scheduleNoteReminder(
     };
   }
 
-  await setupAndroidChannel();
-
   const granted = await requestNotificationPermissions();
   if (!granted) {
     return {
@@ -131,21 +149,29 @@ export async function scheduleNoteReminder(
       await Notifications.cancelScheduledNotificationAsync(note.notificationId);
     }
 
+    const toneId = await getAlarmToneId();
+    const tone = getAlarmTone(toneId);
+    const channelId = await setupAndroidChannel(toneId);
+    const sound = getNotificationSound(tone);
+
     const trigger: import('expo-notifications').DateTriggerInput = {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: new Date(reminderAt),
-      channelId: 'reminders',
+      channelId,
     };
 
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: '⏰ Reminder',
+        title: '⏰ Alarm',
         body: title?.trim() || 'You have a note reminder',
-        sound: 'default',
+        sound,
         priority: Notifications.AndroidNotificationPriority.MAX,
-        vibrate: [0, 400, 200, 400],
+        vibrate: [0, 600, 200, 600, 200, 600],
         data: { noteId },
-        sticky: false,
+        sticky: true,
+        ...(Platform.OS === 'android'
+          ? { categoryIdentifier: 'alarm' }
+          : { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger,
     });
@@ -177,7 +203,7 @@ export async function rescheduleAllReminders(): Promise<void> {
   if (!Notifications) return;
   if (!(await requestNotificationPermissions())) return;
 
-  await setupAndroidChannel();
+  await setupAndroidChannel(await getAlarmToneId());
   const now = Date.now();
   const notes = await listNotes();
 
@@ -193,11 +219,15 @@ export async function initNotificationListeners(
   const Notifications = await getNotifications();
   if (!Notifications) return () => {};
 
-  const received = Notifications.addNotificationReceivedListener(() => {
-    // foreground — handler above shows alert + sound
+  const received = Notifications.addNotificationReceivedListener(async () => {
+    const toneId = await getAlarmToneId();
+    if (shouldPlayFullAlarmInApp(toneId)) {
+      await playAlarmRingtone(toneId);
+    }
   });
 
   const response = Notifications.addNotificationResponseReceivedListener(res => {
+    stopAlarmRingtone();
     const noteId = res.notification.request.content.data?.noteId;
     if (typeof noteId === 'string') onOpenNote(noteId);
   });
@@ -210,7 +240,7 @@ export async function initNotificationListeners(
 
 export function reminderEnvironmentHint(): string | null {
   if (isExpoGo()) {
-    return 'Reminders need a dev build. Run: npm run android (Expo Go has limited alarm support).';
+    return 'Alarms need a dev build. Run: npm run android (Expo Go cannot play custom alarm tones).';
   }
   return null;
 }

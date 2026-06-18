@@ -264,7 +264,7 @@ export const NoteCard = memo(function NoteCard({
               <Text variant="labelSmall" style={{ fontWeight: '600', opacity: 0.7 }}>
                 Checklist
               </Text>
-              <Text variant="labelSmall" style={{ fontWeight: '700', color: theme.colors.primary }}>
+              <Text variant="labelSmall" style={{ fontWeight: '700', opacity: 0.7 }}>
                 {checklistDone}/{checklistTotal}
               </Text>
             </View>
@@ -280,7 +280,7 @@ export const NoteCard = memo(function NoteCard({
                 style={{
                   width: `${checklistPct}%`,
                   height: '100%',
-                  backgroundColor: checklistPct === 100 ? '#4CAF50' : theme.colors.primary,
+                  backgroundColor: checklistPct === 100 ? theme.colors.tertiary : theme.colors.outlineVariant,
                   borderRadius: 3,
                 }}
               />

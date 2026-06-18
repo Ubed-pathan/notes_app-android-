@@ -1,7 +1,8 @@
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { Appbar, Chip, Text, useTheme } from 'react-native-paper';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { Note, listNotes, startOfDay, toggleComplete } from '../../src/storage/notes';
@@ -9,6 +10,7 @@ import { NoteCard } from '../../src/components/NoteCard';
 import { Screen } from '../../src/components/Screen';
 import { AppTopBar } from '../../src/components/AppTopBar';
 import { useScreenBottomInset } from '../../src/hooks/useScreenBottomInset';
+import { openDatePicker } from '../../src/utils/datePicker';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -24,6 +26,7 @@ export default function CalendarScreen() {
     return d;
   });
   const [selectedDay, setSelectedDay] = useState<number | null>(startOfDay(Date.now()));
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [allDueNotes, setAllDueNotes] = useState<Note[]>([]);
 
@@ -65,6 +68,28 @@ export default function CalendarScreen() {
     setViewDate(d);
   };
 
+  const pickMonthYear = () => {
+    const handled = openDatePicker({
+      value: viewDate,
+      onSelect: date => {
+        const d = new Date(date);
+        d.setDate(1);
+        d.setHours(0, 0, 0, 0);
+        setViewDate(d);
+      },
+    });
+    if (!handled) setShowMonthPicker(true);
+  };
+
+  const onMonthPickerChange = (_: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'ios') setShowMonthPicker(false);
+    if (!date) return;
+    const d = new Date(date);
+    d.setDate(1);
+    d.setHours(0, 0, 0, 0);
+    setViewDate(d);
+  };
+
   const selectDay = async (day: number) => {
     const ts = startOfDay(new Date(year, month, day).getTime());
     setSelectedDay(ts);
@@ -90,11 +115,22 @@ export default function CalendarScreen() {
       <View style={{ margin: 12, padding: 16, borderRadius: 20, backgroundColor: theme.colors.surface, elevation: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <Appbar.Action icon="chevron-left" onPress={prevMonth} />
-          <Text variant="titleMedium" style={{ fontWeight: '700' }}>
-            {MONTHS[month]} {year}
-          </Text>
+          <Pressable onPress={pickMonthYear} hitSlop={12} style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
+            <Text variant="titleMedium" style={{ fontWeight: '700', textAlign: 'center' }}>
+              {MONTHS[month]} {year}
+            </Text>
+          </Pressable>
           <Appbar.Action icon="chevron-right" onPress={nextMonth} />
         </View>
+
+        {Platform.OS === 'ios' && showMonthPicker ? (
+          <DateTimePicker
+            value={viewDate}
+            mode="date"
+            display="spinner"
+            onChange={onMonthPickerChange}
+          />
+        ) : null}
 
         <View style={{ flexDirection: 'row', marginBottom: 8 }}>
           {WEEKDAYS.map(w => (
@@ -123,33 +159,55 @@ export default function CalendarScreen() {
                   aspectRatio: 1,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: 12,
-                  backgroundColor: isSelected ? theme.colors.primary : 'transparent',
                 }}
               >
-                <Text
+                <View
                   style={{
-                    fontWeight: isToday ? '800' : '500',
-                    color: isSelected ? theme.colors.onPrimary : isToday ? theme.colors.primary : theme.colors.onSurface,
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isSelected
+                      ? theme.colors.primary
+                      : isToday
+                        ? theme.colors.primaryContainer
+                        : 'transparent',
                   }}
                 >
-                  {day}
-                </Text>
-                {hasTasks ? (
-                  <View
+                  <Text
                     style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      marginTop: 2,
-                      backgroundColor: isSelected
+                      fontWeight: isToday || isSelected ? '700' : '500',
+                      fontSize: 15,
+                      lineHeight: 18,
+                      textAlign: 'center',
+                      includeFontPadding: false,
+                      color: isSelected
                         ? theme.colors.onPrimary
-                        : allDone
-                          ? '#4CAF50'
-                          : theme.colors.primary,
+                        : isToday
+                          ? theme.colors.primary
+                          : theme.colors.onSurface,
                     }}
-                  />
-                ) : null}
+                  >
+                    {day}
+                  </Text>
+                </View>
+                <View style={{ height: 8, alignItems: 'center', justifyContent: 'center' }}>
+                  {hasTasks ? (
+                    <View
+                      style={{
+                        width: 5,
+                        height: 5,
+                        borderRadius: 2.5,
+                        backgroundColor: isSelected
+                          ? theme.colors.primary
+                          : allDone
+                            ? '#4CAF50'
+                            : theme.colors.primary,
+                      }}
+                    />
+                  ) : null}
+                </View>
               </Pressable>
             );
           })}

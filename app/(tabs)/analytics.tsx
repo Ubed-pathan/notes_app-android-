@@ -66,7 +66,7 @@ export default function AnalyticsScreen() {
               size={90}
               strokeWidth={8}
               label={`${checklistPct}%`}
-              color="#00897B"
+              color={theme.colors.tertiary}
             />
             <View style={{ flex: 1 }}>
               <Text variant="bodyLarge" style={{ fontWeight: '600' }}>
@@ -75,7 +75,11 @@ export default function AnalyticsScreen() {
               <Text variant="bodySmall" style={{ opacity: 0.6, marginTop: 4 }}>
                 checklist items completed across all notes
               </Text>
-              <ProgressBar progress={checklistPct / 100} style={{ marginTop: 12, height: 8, borderRadius: 4 }} />
+              <ProgressBar
+                progress={checklistPct / 100}
+                color={theme.colors.tertiary}
+                style={{ marginTop: 12, height: 8, borderRadius: 4, backgroundColor: theme.colors.tertiaryContainer }}
+              />
             </View>
           </View>
         </Surface>

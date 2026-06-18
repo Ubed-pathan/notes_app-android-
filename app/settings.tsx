@@ -3,6 +3,7 @@ import { Appbar, List, RadioButton, Text, Surface, Divider, useTheme } from 'rea
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '../src/theme/ThemeProvider';
 import { CustomThemeGenerator } from '../src/components/CustomThemeGenerator';
+import { AlarmRingtoneSettings } from '../src/components/AlarmRingtoneSettings';
 import { AboutSection } from '../src/components/AboutSection';
 import Constants from 'expo-constants';
 
@@ -47,6 +48,15 @@ export default function SettingsScreen() {
                 right={() => <RadioButton value="dark" color={theme.colors.primary} />}
               />
             </RadioButton.Group>
+          </List.Section>
+        </Surface>
+
+        <Surface style={{ marginTop: 12, borderRadius: 16, overflow: 'hidden', backgroundColor: theme.colors.surface, elevation: 1 }}>
+          <List.Section>
+            <List.Subheader style={{ opacity: 0.8, paddingHorizontal: 16 }}>Reminders & Alarms</List.Subheader>
+            <View style={{ paddingHorizontal: 8, paddingBottom: 8 }}>
+              <AlarmRingtoneSettings />
+            </View>
           </List.Section>
         </Surface>
 

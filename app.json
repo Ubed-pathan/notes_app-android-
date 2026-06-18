@@ -19,8 +19,13 @@
         {
           "icon": "./assets/icon-1024.png",
           "color": "#6750A4",
-          "defaultChannel": "reminders",
-          "sounds": []
+          "defaultChannel": "reminders-classic_alarm",
+          "sounds": [
+            "./assets/sounds/classic_alarm.wav",
+            "./assets/sounds/soft_chime.wav",
+            "./assets/sounds/digital_beep.wav",
+            "./assets/sounds/gentle_bell.wav"
+          ]
         }
       ]
     ],
