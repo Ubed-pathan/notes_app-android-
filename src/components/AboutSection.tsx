@@ -9,7 +9,15 @@ type Props = {
   version: string;
 };
 
-function AboutChip({ label, icon, colors }: { label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; colors: typeof ABOUT_COLORS.light }) {
+function AboutChip({
+  label,
+  icon,
+  colors,
+}: {
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  colors: (typeof ABOUT_COLORS)[keyof typeof ABOUT_COLORS];
+}) {
   return (
     <View
       style={{

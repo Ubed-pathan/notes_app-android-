@@ -17,7 +17,6 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
-        tabBarSafeAreaInsets: { top: 0, bottom: 0 },
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.outlineVariant,
