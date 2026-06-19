@@ -163,9 +163,9 @@ export default function CalendarScreen() {
               >
                 <View
                   style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 19,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
                     alignItems: 'center',
                     justifyContent: 'center',
                     backgroundColor: isSelected
@@ -179,8 +179,9 @@ export default function CalendarScreen() {
                     style={{
                       fontWeight: isToday || isSelected ? '700' : '500',
                       fontSize: 15,
-                      lineHeight: 18,
+                      lineHeight: 20,
                       textAlign: 'center',
+                      textAlignVertical: 'center',
                       includeFontPadding: false,
                       color: isSelected
                         ? theme.colors.onPrimary
@@ -192,22 +193,22 @@ export default function CalendarScreen() {
                     {day}
                   </Text>
                 </View>
-                <View style={{ height: 8, alignItems: 'center', justifyContent: 'center' }}>
-                  {hasTasks ? (
-                    <View
-                      style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: 2.5,
-                        backgroundColor: isSelected
-                          ? theme.colors.primary
-                          : allDone
-                            ? '#4CAF50'
-                            : theme.colors.primary,
-                      }}
-                    />
-                  ) : null}
-                </View>
+                {hasTasks ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: 5,
+                      width: 5,
+                      height: 5,
+                      borderRadius: 2.5,
+                      backgroundColor: isSelected
+                        ? theme.colors.primary
+                        : allDone
+                          ? '#4CAF50'
+                          : theme.colors.primary,
+                    }}
+                  />
+                ) : null}
               </Pressable>
             );
           })}
@@ -216,13 +217,20 @@ export default function CalendarScreen() {
 
       <View style={{ flex: 1, paddingHorizontal: 12, minHeight: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <Text variant="titleSmall" style={{ fontWeight: '700' }}>
+          <Text variant="titleSmall" style={{ fontWeight: '700', flex: 1, paddingRight: 8 }}>
             {selectedDay
               ? new Date(selectedDay).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
               : 'Select a day'}
           </Text>
           {selectedDay === todayStart ? (
-            <Chip compact icon="star" style={{ height: 28 }}>Today</Chip>
+            <Chip
+              compact
+              icon="star"
+              style={{ alignSelf: 'center' }}
+              textStyle={{ lineHeight: 20, includeFontPadding: false, marginVertical: 0 }}
+            >
+              Today
+            </Chip>
           ) : null}
         </View>
 

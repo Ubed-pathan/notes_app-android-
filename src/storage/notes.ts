@@ -20,6 +20,7 @@ export type Note = {
   completedAt?: number | null;
   reminderAt?: number | null;
   notificationId?: string | null;
+  upcomingNotificationId?: string | null;
   images?: string[];
   checklist?: ChecklistItem[];
 };
@@ -129,6 +130,10 @@ export async function upsertNote(input: Partial<Note> & { id?: string }): Promis
     completedAt: input.completedAt !== undefined ? input.completedAt : (prev?.completedAt ?? null),
     reminderAt: input.reminderAt !== undefined ? input.reminderAt : (prev?.reminderAt ?? null),
     notificationId: input.notificationId !== undefined ? input.notificationId : (prev?.notificationId ?? null),
+    upcomingNotificationId:
+      input.upcomingNotificationId !== undefined
+        ? input.upcomingNotificationId
+        : (prev?.upcomingNotificationId ?? null),
     images: input.images ?? prev?.images ?? [],
     checklist: input.checklist ?? prev?.checklist ?? [],
   };

@@ -9,7 +9,9 @@ import {
   setAlarmToneId,
 } from '../storage/reminderSettings';
 import { rescheduleAllReminders } from '../services/notifications';
-import { previewAlarmRingtone, stopAlarmRingtone } from '../services/alarmPlayback';
+import { previewAlarmRingtone, previewCustomAlarmTone, stopAlarmRingtone } from '../services/alarmPlayback';
+import { SnoozeSettings } from './SnoozeSettings';
+import { AdvanceReminderSettings } from './AdvanceReminderSettings';
 
 export function AlarmRingtoneSettings() {
   const theme = useTheme();
@@ -36,11 +38,37 @@ export function AlarmRingtoneSettings() {
     setPreviewing(null);
   }, []);
 
+  const listenToCustomTone = useCallback(async () => {
+    if (!customName) {
+      Alert.alert('No tone yet', 'Tap “Choose audio file” to add your alarm sound first.');
+      return;
+    }
+
+    if (previewing === 'custom') {
+      await stopPreview();
+      return;
+    }
+
+    await stopPreview();
+    setPreviewing('custom');
+    try {
+      const sound = await previewCustomAlarmTone();
+      if (!sound) {
+        setPreviewing(null);
+        Alert.alert('Cannot play tone', 'The saved file was not found. Please choose it again.');
+        return;
+      }
+    } catch {
+      setPreviewing(null);
+      Alert.alert('Playback failed', 'Could not play this audio file. Try MP3, WAV, or M4A.');
+    }
+  }, [customName, previewing, stopPreview]);
+
   const previewTone = useCallback(
     async (id: AlarmToneId) => {
       if (id === 'default') return;
-      if (id === 'custom' && !customName) {
-        Alert.alert('No custom tone', 'Pick an audio file first.');
+      if (id === 'custom') {
+        await listenToCustomTone();
         return;
       }
 
@@ -67,7 +95,7 @@ export function AlarmRingtoneSettings() {
         Alert.alert('Preview failed', 'Could not play this tone.');
       }
     },
-    [customName, previewing, stopPreview]
+    [listenToCustomTone, previewing, stopPreview]
   );
 
   const selectTone = useCallback(
@@ -101,8 +129,8 @@ export function AlarmRingtoneSettings() {
   return (
     <View>
       <Text variant="bodySmall" style={{ opacity: 0.65, marginBottom: 8, paddingHorizontal: 4 }}>
-        Reminders ring as full-length alarms. Built-in tones play completely (~6 seconds). Your own tone loops until
-        you open the alarm.
+        Reminders ring as full-length alarms. Built-in tones play completely. Your own tone loops until you open or
+        snooze the alarm.
       </Text>
       <RadioButton.Group onValueChange={v => selectTone(v as AlarmToneId)} value={selected}>
         {ALARM_TONES.map((tone, index) => (
@@ -112,7 +140,7 @@ export function AlarmRingtoneSettings() {
               title={tone.id === 'custom' && customName ? `My tone · ${customName}` : tone.label}
               description={
                 tone.id === 'custom' && customName
-                  ? 'Your chosen audio file (loops on alarm)'
+                  ? 'Your chosen audio file'
                   : tone.description
               }
               left={props => (
@@ -121,7 +149,7 @@ export function AlarmRingtoneSettings() {
               onPress={() => selectTone(tone.id)}
               right={() => (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {tone.id !== 'default' ? (
+                  {tone.id !== 'default' && tone.id !== 'custom' ? (
                     <IconButton
                       icon={previewing === tone.id ? 'stop' : 'play-circle-outline'}
                       size={22}
@@ -133,7 +161,7 @@ export function AlarmRingtoneSettings() {
               )}
             />
             {tone.id === 'custom' ? (
-              <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+              <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}>
                 <Button
                   mode="contained-tonal"
                   icon="folder-music-outline"
@@ -142,11 +170,23 @@ export function AlarmRingtoneSettings() {
                 >
                   Choose audio file
                 </Button>
+                {customName ? (
+                  <Button
+                    mode="contained"
+                    icon={previewing === 'custom' ? 'stop' : 'volume-high'}
+                    onPress={listenToCustomTone}
+                  >
+                    {previewing === 'custom' ? 'Stop listening' : 'Listen to my tone'}
+                  </Button>
+                ) : null}
               </View>
             ) : null}
           </View>
         ))}
       </RadioButton.Group>
+
+      <SnoozeSettings />
+      <AdvanceReminderSettings />
     </View>
   );
 }

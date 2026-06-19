@@ -5,6 +5,14 @@ import { AlarmToneId, DEFAULT_ALARM_TONE_ID } from '../constants/alarmTones';
 
 const ALARM_TONE_KEY = '@alkitab/alarm-tone';
 const CUSTOM_ALARM_KEY = '@alkitab/custom-alarm-tone';
+const SNOOZE_ENABLED_KEY = '@alkitab/snooze-enabled';
+const SNOOZE_MINUTES_KEY = '@alkitab/snooze-minutes';
+const ADVANCE_REMINDER_KEY = '@alkitab/advance-reminder-enabled';
+
+export const UPCOMING_REMINDER_MINUTES = 30;
+
+export const DEFAULT_SNOOZE_MINUTES = 10;
+export const SNOOZE_MINUTE_OPTIONS = [5, 10, 15, 20, 30] as const;
 
 export type CustomAlarmTone = {
   uri: string;
@@ -84,4 +92,47 @@ export async function clearCustomAlarmTone(): Promise<void> {
   for (const file of dirEntries) {
     await FileSystem.deleteAsync(`${CUSTOM_ALARM_DIR}${file}`, { idempotent: true });
   }
+}
+
+export async function getSnoozeEnabled(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(SNOOZE_ENABLED_KEY);
+    if (raw === 'false') return false;
+  } catch {
+    // ignore
+  }
+  return true;
+}
+
+export async function setSnoozeEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(SNOOZE_ENABLED_KEY, enabled ? 'true' : 'false');
+}
+
+export async function getSnoozeMinutes(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(SNOOZE_MINUTES_KEY);
+    const n = raw ? parseInt(raw, 10) : DEFAULT_SNOOZE_MINUTES;
+    if (SNOOZE_MINUTE_OPTIONS.includes(n as (typeof SNOOZE_MINUTE_OPTIONS)[number])) return n;
+  } catch {
+    // ignore
+  }
+  return DEFAULT_SNOOZE_MINUTES;
+}
+
+export async function setSnoozeMinutes(minutes: number): Promise<void> {
+  await AsyncStorage.setItem(SNOOZE_MINUTES_KEY, String(minutes));
+}
+
+export async function getAdvanceReminderEnabled(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(ADVANCE_REMINDER_KEY);
+    if (raw === 'false') return false;
+  } catch {
+    // ignore
+  }
+  return true;
+}
+
+export async function setAdvanceReminderEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(ADVANCE_REMINDER_KEY, enabled ? 'true' : 'false');
 }

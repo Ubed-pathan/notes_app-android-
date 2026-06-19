@@ -5,11 +5,14 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AlarmAlertModal } from '../src/components/AlarmAlertModal';
 import {
   setupAndroidChannel,
+  setupUpcomingAndroidChannel,
   requestNotificationPermissions,
   initNotificationListeners,
   rescheduleAllReminders,
+  setupNotificationCategories,
 } from '../src/services/notifications';
 
 export default function RootLayout() {
@@ -18,6 +21,8 @@ export default function RootLayout() {
   useEffect(() => {
     (async () => {
       await setupAndroidChannel();
+      await setupUpcomingAndroidChannel();
+      await setupNotificationCategories();
       await requestNotificationPermissions();
       await rescheduleAllReminders();
     })();
@@ -37,6 +42,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AppThemeProvider>
           <StatusBar style="auto" />
+          <AlarmAlertModal />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="note" options={{ title: 'Edit Note', presentation: 'card' }} />
