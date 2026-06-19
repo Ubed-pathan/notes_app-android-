@@ -107,9 +107,9 @@ export const NoteCard = memo(function NoteCard({
         marginBottom: 14,
         borderRadius: 18,
         backgroundColor: cardBg,
-        borderWidth: 1,
+        borderWidth: note.pinned && !note.completed ? 2 : 1,
         borderColor: note.pinned && !note.completed
-          ? theme.colors.primary + '40'
+          ? theme.colors.primary
           : theme.colors.outlineVariant,
         overflow: 'hidden',
         opacity: note.completed ? 0.88 : pressed ? 0.96 : 1,
@@ -122,9 +122,36 @@ export const NoteCard = memo(function NoteCard({
       })}
     >
       {/* Status accent strip */}
-      <View style={{ height: 4, backgroundColor: accentColor }} />
+      <View
+        style={{
+          height: 4,
+          backgroundColor: accentColor,
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}
+      />
 
-      <View style={{ padding: 14, paddingTop: 12 }}>
+      {note.pinned && !note.completed ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            alignSelf: 'flex-start',
+            marginLeft: 14,
+            marginTop: 10,
+            backgroundColor: theme.colors.primaryContainer,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 20,
+            gap: 4,
+          }}
+        >
+          <MaterialCommunityIcons name="pin" size={14} color={theme.colors.primary} />
+          <Text style={{ fontSize: 11, fontWeight: '800', color: theme.colors.primary }}>PINNED</Text>
+        </View>
+      ) : null}
+
+      <View style={{ padding: 14, paddingTop: note.pinned && !note.completed ? 8 : 12 }}>
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
           {onToggleComplete ? (
@@ -289,8 +316,11 @@ export const NoteCard = memo(function NoteCard({
         ) : null}
 
         {/* Meta tags */}
-        {(note.dueDate || hasReminder || note.completed) ? (
+        {(note.pinned || note.dueDate || hasReminder || note.completed) ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 12 }}>
+            {note.pinned && !note.completed ? (
+              <MetaTag icon="pin" label="Pinned" color={theme.colors.primary} bg={theme.colors.primaryContainer} />
+            ) : null}
             {note.completed ? (
               <MetaTag icon="check-circle" label="Completed" color="#2E7D32" bg="#E8F5E9" />
             ) : null}

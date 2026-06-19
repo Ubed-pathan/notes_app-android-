@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { upsertNote, getNote, listNotes } from '../storage/notes';
 import { getAlarmToneId, getSnoozeEnabled, getSnoozeMinutes, getAdvanceReminderEnabled, UPCOMING_REMINDER_MINUTES } from '../storage/reminderSettings';
-import { getAlarmTone, getNotificationSound, getReminderChannelId, shouldPlayFullAlarmInApp } from '../constants/alarmTones';
+import { getAlarmTone, getNotificationSound, getReminderChannelId } from '../constants/alarmTones';
 import { playAlarmRingtone, stopAlarmRingtone } from './alarmPlayback';
 import { clearAlarmAlert, showAlarmAlert } from './alarmAlertBus';
 
@@ -15,7 +15,7 @@ export type ScheduleResult =
   | { ok: true; id: string }
   | { ok: false; reason: string; message: string };
 
-export const UPCOMING_REMINDER_CHANNEL_ID = 'reminders-upcoming';
+export const UPCOMING_REMINDER_CHANNEL_ID = 'reminders-upcoming-v2';
 const NOTIFICATION_ACCENT = '#6750A4';
 const UPCOMING_REMINDER_MS = UPCOMING_REMINDER_MINUTES * 60 * 1000;
 
@@ -62,10 +62,9 @@ async function getNotifications(): Promise<NotificationsModule | null> {
               };
             }
 
-            const toneId = await getAlarmToneId();
             return {
               shouldShowAlert: true,
-              shouldPlaySound: !shouldPlayFullAlarmInApp(toneId),
+              shouldPlaySound: true,
               shouldSetBadge: true,
               shouldShowBanner: true,
               shouldShowList: true,
@@ -262,13 +261,16 @@ export async function setupAndroidChannel(toneId?: import('../constants/alarmTon
 
   await Notifications.setNotificationChannelAsync(channelId, {
     name: channelLabel,
-    description: 'Note reminder alarms',
+    description: 'Note reminder alarms — uses alarm volume',
     importance: Notifications.AndroidImportance.MAX,
     sound: typeof sound === 'string' ? sound : 'default',
-    vibrationPattern: [0, 600, 200, 600, 200, 600],
+    vibrationPattern: [0, 600, 200, 600, 200, 600, 200, 600],
     enableVibrate: true,
     bypassDnd: true,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    showBadge: true,
+    enableLights: true,
+    lightColor: NOTIFICATION_ACCENT,
     audioAttributes: {
       usage: Notifications.AndroidAudioUsage.ALARM,
       contentType: Notifications.AndroidAudioContentType.SONIFICATION,
@@ -411,6 +413,43 @@ export async function rescheduleAllReminders(): Promise<void> {
   }
 }
 
+/** Handle alarm notification — show modal + play ringtone (foreground or background). */
+export async function handleAlarmNotification(
+  notification: import('expo-notifications').Notification
+): Promise<void> {
+  const data = notification.request.content.data;
+  if (data?.isUpcoming === true || data?.isAlarm !== true) return;
+
+  const noteId = data?.noteId;
+  if (typeof noteId !== 'string') return;
+
+  const title =
+    (typeof data?.noteTitle === 'string' && data.noteTitle) ||
+    notification.request.content.body ||
+    'Note reminder';
+
+  showAlarmAlert({
+    noteId,
+    title,
+    notificationId: notification.request.identifier,
+  });
+
+  const toneId = await getAlarmToneId();
+  await playAlarmRingtone(toneId);
+}
+
+/** When app returns to foreground, resume alarm if notification is still showing. */
+export async function resumeActiveAlarmIfNeeded(): Promise<void> {
+  const Notifications = await getNotifications();
+  if (!Notifications) return;
+
+  const presented = await Notifications.getPresentedNotificationsAsync();
+  const alarmNotification = presented.find(n => n.request.content.data?.isAlarm === true);
+  if (!alarmNotification) return;
+
+  await handleAlarmNotification(alarmNotification);
+}
+
 export async function initNotificationListeners(
   onOpenNote?: (noteId: string) => void
 ): Promise<() => void> {
@@ -419,25 +458,9 @@ export async function initNotificationListeners(
 
   const received = Notifications.addNotificationReceivedListener(async notification => {
     const data = notification.request.content.data;
-    const noteId = data?.noteId;
-    if (typeof noteId !== 'string') return;
-
     if (data?.isUpcoming === true) return;
-
-    const title =
-      (typeof data?.noteTitle === 'string' && data.noteTitle) ||
-      notification.request.content.body ||
-      'Note reminder';
-
-    showAlarmAlert({
-      noteId,
-      title,
-      notificationId: notification.request.identifier,
-    });
-
-    const toneId = await getAlarmToneId();
-    if (shouldPlayFullAlarmInApp(toneId)) {
-      await playAlarmRingtone(toneId);
+    if (data?.isAlarm === true) {
+      await handleAlarmNotification(notification);
     }
   });
 
@@ -475,11 +498,7 @@ export async function initNotificationListeners(
     }
 
     if (defaultAction) {
-      showAlarmAlert({ noteId, title, notificationId });
-      const toneId = await getAlarmToneId();
-      if (shouldPlayFullAlarmInApp(toneId)) {
-        await playAlarmRingtone(toneId);
-      }
+      await handleAlarmNotification(res.notification);
       return;
     }
 

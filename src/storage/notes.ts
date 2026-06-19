@@ -33,6 +33,7 @@ export type NoteFilter = {
   createdDate?: number | null;
   completed?: boolean | null;
   hasReminder?: boolean;
+  pinned?: boolean;
 };
 
 const NOTES_KEY = 'notes.v1';
@@ -86,6 +87,7 @@ function applyFilters(all: Note[], opts?: NoteFilter): Note[] {
   if (opts?.completed === true) filtered = filtered.filter(n => !!n.completed);
   if (opts?.completed === false) filtered = filtered.filter(n => !n.completed);
   if (opts?.hasReminder) filtered = filtered.filter(n => !!n.reminderAt && n.reminderAt > Date.now());
+  if (opts?.pinned === true) filtered = filtered.filter(n => !!n.pinned);
   if (opts?.dueDate != null) {
     const day = startOfDay(opts.dueDate);
     filtered = filtered.filter(n => n.dueDate != null && startOfDay(n.dueDate) === day);

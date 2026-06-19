@@ -14,7 +14,7 @@ import { AppTopBar } from '../../src/components/AppTopBar';
 import { openDatePicker } from '../../src/utils/datePicker';
 import { useScreenBottomInset } from '../../src/hooks/useScreenBottomInset';
 
-type FilterMode = 'all' | 'pending' | 'completed' | 'byDate' | 'overdue';
+type FilterMode = 'all' | 'pending' | 'completed' | 'pinned' | 'byDate' | 'overdue';
 
 const FILTER_BOX_W = 76;
 const FILTER_BOX_H = 68;
@@ -43,6 +43,10 @@ export default function NotesScreen() {
     const opts: Parameters<typeof listNotes>[0] = { query: q, onlyPublic: true };
     if (filter === 'completed') opts.completed = true;
     if (filter === 'pending') opts.completed = false;
+    if (filter === 'pinned') {
+      opts.pinned = true;
+      opts.completed = false;
+    }
     if (filter === 'byDate') {
       if (byDateMode === 'due') opts.dueDate = selectedDueDate.getTime();
       else opts.createdDate = selectedDueDate.getTime();
@@ -113,6 +117,7 @@ export default function NotesScreen() {
 
   const filters: { key: FilterMode; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; wide?: boolean }[] = [
     { key: 'all', label: 'All', icon: 'format-list-bulleted' },
+    { key: 'pinned', label: 'Pinned', icon: 'pin' },
     { key: 'pending', label: 'Pending', icon: 'clock-outline' },
     { key: 'completed', label: 'Done', icon: 'check-circle' },
     { key: 'byDate', label: 'By Date', icon: 'calendar-month', wide: true },
@@ -261,7 +266,9 @@ export default function NotesScreen() {
             <Text variant="titleMedium" style={{ opacity: 0.7, textAlign: 'center' }}>
               {filter === 'all'
                 ? 'No notes yet'
-                : filter === 'byDate'
+                : filter === 'pinned'
+                  ? 'No pinned notes'
+                  : filter === 'byDate'
                   ? byDateMode === 'due'
                     ? `No tasks due ${selectedDueDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`
                     : `No notes created ${selectedDueDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`

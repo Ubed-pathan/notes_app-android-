@@ -19,7 +19,7 @@
         {
           "icon": "./assets/icon-1024.png",
           "color": "#6750A4",
-          "defaultChannel": "reminders-classic_alarm",
+          "defaultChannel": "reminders-v2-classic_alarm",
           "sounds": [
             "./assets/sounds/classic_alarm.wav",
             "./assets/sounds/soft_chime.wav",
@@ -48,7 +48,9 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "SCHEDULE_EXACT_ALARM",
-        "USE_EXACT_ALARM"
+        "USE_EXACT_ALARM",
+        "USE_FULL_SCREEN_INTENT",
+        "WAKE_LOCK"
       ]
     },
     "web": {

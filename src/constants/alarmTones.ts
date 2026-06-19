@@ -66,7 +66,7 @@ export function getAlarmTone(id: AlarmToneId): AlarmTone {
 }
 
 export function getReminderChannelId(toneId: AlarmToneId): string {
-  return `reminders-${toneId}`;
+  return `reminders-v2-${toneId}`;
 }
 
 /** Sound key passed to expo-notifications content + Android channel */

@@ -2,7 +2,8 @@ import 'react-native-gesture-handler';
 import { Stack, useRouter } from 'expo-router';
 import { AppThemeProvider } from '../src/theme/ThemeProvider';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AlarmAlertModal } from '../src/components/AlarmAlertModal';
@@ -13,10 +14,12 @@ import {
   initNotificationListeners,
   rescheduleAllReminders,
   setupNotificationCategories,
+  resumeActiveAlarmIfNeeded,
 } from '../src/services/notifications';
 
 export default function RootLayout() {
   const router = useRouter();
+  const appState = useRef(AppState.currentState);
 
   useEffect(() => {
     (async () => {
@@ -34,7 +37,17 @@ export default function RootLayout() {
       cleanup = remove;
     });
 
-    return () => cleanup();
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && next === 'active') {
+        void resumeActiveAlarmIfNeeded();
+      }
+      appState.current = next;
+    });
+
+    return () => {
+      cleanup();
+      sub.remove();
+    };
   }, [router]);
 
   return (
