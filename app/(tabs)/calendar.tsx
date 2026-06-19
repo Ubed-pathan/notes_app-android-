@@ -3,10 +3,18 @@ import { useCallback, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { Appbar, Chip, Text, useTheme } from 'react-native-paper';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
-import { Note, listNotes, startOfDay, toggleComplete } from '../../src/storage/notes';
+import {
+  Note,
+  listNotes,
+  startOfDay,
+  toggleComplete,
+  deleteNote,
+  togglePin,
+  setPrivate,
+} from '../../src/storage/notes';
 import { NoteCard } from '../../src/components/NoteCard';
+import { DateViewMode, DateViewModeToggle } from '../../src/components/DateViewModeToggle';
 import { Screen } from '../../src/components/Screen';
 import { AppTopBar } from '../../src/components/AppTopBar';
 import { useScreenBottomInset } from '../../src/hooks/useScreenBottomInset';
@@ -26,20 +34,24 @@ export default function CalendarScreen() {
     return d;
   });
   const [selectedDay, setSelectedDay] = useState<number | null>(startOfDay(Date.now()));
+  const [dateViewMode, setDateViewMode] = useState<DateViewMode>('due');
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [allDueNotes, setAllDueNotes] = useState<Note[]>([]);
+  const [allPublicNotes, setAllPublicNotes] = useState<Note[]>([]);
 
   const load = useCallback(async () => {
     const all = await listNotes({ onlyPublic: true });
-    setAllDueNotes(all.filter(n => n.dueDate != null));
+    setAllPublicNotes(all);
     if (selectedDay != null) {
-      const dayNotes = await listNotes({ onlyPublic: true, dueDate: selectedDay });
+      const dayNotes =
+        dateViewMode === 'due'
+          ? await listNotes({ onlyPublic: true, dueDate: selectedDay })
+          : await listNotes({ onlyPublic: true, createdDate: selectedDay });
       setNotes(dayNotes);
     } else {
       setNotes([]);
     }
-  }, [selectedDay]);
+  }, [selectedDay, dateViewMode]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -48,13 +60,17 @@ export default function CalendarScreen() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstWeekday = new Date(year, month, 1).getDay();
 
-  const dueDays = useMemo(() => {
+  const markedDays = useMemo(() => {
     const set = new Set<number>();
-    for (const n of allDueNotes) {
-      if (n.dueDate) set.add(startOfDay(n.dueDate));
+    for (const n of allPublicNotes) {
+      if (dateViewMode === 'due') {
+        if (n.dueDate) set.add(startOfDay(n.dueDate));
+      } else {
+        set.add(startOfDay(n.createdAt));
+      }
     }
     return set;
-  }, [allDueNotes]);
+  }, [allPublicNotes, dateViewMode]);
 
   const prevMonth = () => {
     const d = new Date(viewDate);
@@ -102,6 +118,25 @@ export default function CalendarScreen() {
     load();
   };
 
+  const onDelete = async (id: string) => {
+    await deleteNote(id);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    load();
+  };
+
+  const onTogglePin = async (id: string) => {
+    await togglePin(id);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    load();
+  };
+
+  const onTogglePrivate = async (id: string) => {
+    const note = notes.find(n => n.id === id);
+    await setPrivate(id, !note?.isPrivate);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    load();
+  };
+
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -110,10 +145,31 @@ export default function CalendarScreen() {
 
   return (
     <Screen style={{ backgroundColor: theme.colors.background }}>
-      <AppTopBar title="Calendar" subtitle="Day-wise tasks" />
+      <AppTopBar
+        title="Calendar"
+        subtitle={dateViewMode === 'due' ? 'Tasks by due date' : 'Notes by created date'}
+      />
 
-      <View style={{ margin: 12, padding: 16, borderRadius: 20, backgroundColor: theme.colors.surface, elevation: 2 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: scrollPaddingBottom }}
+      >
+        <View style={{ paddingHorizontal: 12 }}>
+          <DateViewModeToggle value={dateViewMode} onChange={setDateViewMode} />
+        </View>
+
+        <View
+          style={{
+            marginHorizontal: 12,
+            marginBottom: 12,
+            padding: 16,
+            borderRadius: 20,
+            backgroundColor: theme.colors.surface,
+            elevation: 2,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <Appbar.Action icon="chevron-left" onPress={prevMonth} />
           <Pressable onPress={pickMonthYear} hitSlop={12} style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
             <Text variant="titleMedium" style={{ fontWeight: '700', textAlign: 'center' }}>
@@ -121,34 +177,47 @@ export default function CalendarScreen() {
             </Text>
           </Pressable>
           <Appbar.Action icon="chevron-right" onPress={nextMonth} />
-        </View>
+          </View>
 
-        {Platform.OS === 'ios' && showMonthPicker ? (
-          <DateTimePicker
-            value={viewDate}
-            mode="date"
-            display="spinner"
-            onChange={onMonthPickerChange}
-          />
-        ) : null}
+          {Platform.OS === 'ios' && showMonthPicker ? (
+            <DateTimePicker
+              value={viewDate}
+              mode="date"
+              display="spinner"
+              onChange={onMonthPickerChange}
+            />
+          ) : null}
 
-        <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-          {WEEKDAYS.map(w => (
-            <View key={w} style={{ flex: 1, alignItems: 'center' }}>
-              <Text variant="labelSmall" style={{ opacity: 0.5, fontWeight: '700' }}>{w}</Text>
-            </View>
-          ))}
-        </View>
+          <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+            {WEEKDAYS.map(w => (
+              <View key={w} style={{ flex: 1, alignItems: 'center' }}>
+                <Text variant="labelSmall" style={{ opacity: 0.5, fontWeight: '700' }}>{w}</Text>
+              </View>
+            ))}
+          </View>
 
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {cells.map((day, idx) => {
             if (day == null) return <View key={`e-${idx}`} style={{ width: '14.28%', aspectRatio: 1 }} />;
             const ts = startOfDay(new Date(year, month, day).getTime());
             const isSelected = selectedDay === ts;
             const isToday = ts === todayStart;
-            const hasTasks = dueDays.has(ts);
-            const dayNotes = allDueNotes.filter(n => n.dueDate && startOfDay(n.dueDate) === ts);
-            const allDone = dayNotes.length > 0 && dayNotes.every(n => n.completed);
+            const hasNotes = markedDays.has(ts);
+            const dayDueNotes = allPublicNotes.filter(
+              n => n.dueDate != null && startOfDay(n.dueDate) === ts
+            );
+            const allDone =
+              dateViewMode === 'due' &&
+              dayDueNotes.length > 0 &&
+              dayDueNotes.every(n => n.completed);
+            const dotColor =
+              dateViewMode === 'created'
+                ? theme.colors.tertiary
+                : isSelected
+                  ? theme.colors.primary
+                  : allDone
+                    ? '#4CAF50'
+                    : theme.colors.primary;
 
             return (
               <Pressable
@@ -193,7 +262,7 @@ export default function CalendarScreen() {
                     {day}
                   </Text>
                 </View>
-                {hasTasks ? (
+                {hasNotes ? (
                   <View
                     style={{
                       position: 'absolute',
@@ -201,59 +270,59 @@ export default function CalendarScreen() {
                       width: 5,
                       height: 5,
                       borderRadius: 2.5,
-                      backgroundColor: isSelected
-                        ? theme.colors.primary
-                        : allDone
-                          ? '#4CAF50'
-                          : theme.colors.primary,
+                      backgroundColor: dotColor,
                     }}
                   />
                 ) : null}
               </Pressable>
             );
           })}
-        </View>
-      </View>
-
-      <View style={{ flex: 1, paddingHorizontal: 12, minHeight: 0 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <Text variant="titleSmall" style={{ fontWeight: '700', flex: 1, paddingRight: 8 }}>
-            {selectedDay
-              ? new Date(selectedDay).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
-              : 'Select a day'}
-          </Text>
-          {selectedDay === todayStart ? (
-            <Chip
-              compact
-              icon="star"
-              style={{ alignSelf: 'center' }}
-              textStyle={{ lineHeight: 20, includeFontPadding: false, marginVertical: 0 }}
-            >
-              Today
-            </Chip>
-          ) : null}
+          </View>
         </View>
 
-        {notes.length > 0 ? (
-          <FlashList
-            data={notes}
-            renderItem={({ item }) => (
+        <View style={{ paddingHorizontal: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text variant="titleSmall" style={{ fontWeight: '700', flex: 1, paddingRight: 8 }}>
+              {selectedDay
+                ? new Date(selectedDay).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+                : 'Select a day'}
+            </Text>
+            {selectedDay === todayStart ? (
+              <Chip
+                compact
+                icon="star"
+                style={{ alignSelf: 'center' }}
+                textStyle={{ lineHeight: 20, includeFontPadding: false, marginVertical: 0 }}
+              >
+                Today
+              </Chip>
+            ) : null}
+          </View>
+
+          {notes.length > 0 ? (
+            notes.map(item => (
               <NoteCard
+                key={item.id}
                 note={item}
+                onDelete={() => onDelete(item.id)}
+                onTogglePin={() => onTogglePin(item.id)}
+                onTogglePrivate={() => onTogglePrivate(item.id)}
                 onToggleComplete={() => onToggleComplete(item.id)}
                 onPress={() => router.push({ pathname: '/note', params: { id: item.id } })}
               />
-            )}
-            keyExtractor={i => i.id}
-            contentContainerStyle={{ paddingBottom: scrollPaddingBottom }}
-          />
-        ) : (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: scrollPaddingBottom }}>
-            <Text style={{ fontSize: 40, marginBottom: 8 }}>📅</Text>
-            <Text variant="bodyMedium" style={{ opacity: 0.6 }}>No tasks for this day</Text>
-          </View>
-        )}
-      </View>
+            ))
+          ) : (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Text style={{ fontSize: 40, marginBottom: 8 }}>📅</Text>
+              <Text variant="bodyMedium" style={{ opacity: 0.6, textAlign: 'center' }}>
+                {dateViewMode === 'due'
+                  ? 'No tasks due on this day'
+                  : 'No notes created on this day'}
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </Screen>
   );
 }

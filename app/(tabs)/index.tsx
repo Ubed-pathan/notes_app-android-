@@ -8,6 +8,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import * as Haptics from 'expo-haptics';
 import { Note, listNotes, deleteNote, togglePin, setPrivate, toggleComplete, startOfDay as dayStart } from '../../src/storage/notes';
 import { NoteCard } from '../../src/components/NoteCard';
+import { DateViewMode, DateViewModeToggle } from '../../src/components/DateViewModeToggle';
 import { Screen } from '../../src/components/Screen';
 import { AppTopBar } from '../../src/components/AppTopBar';
 import { openDatePicker } from '../../src/utils/datePicker';
@@ -33,6 +34,7 @@ export default function NotesScreen() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [filter, setFilter] = useState<FilterMode>('all');
   const [selectedDueDate, setSelectedDueDate] = useState(() => startOfDay(new Date()));
+  const [byDateMode, setByDateMode] = useState<DateViewMode>('due');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [triggeredPrivate, setTriggeredPrivate] = useState(false);
   const hasScrolledRef = useRef(false);
@@ -41,7 +43,10 @@ export default function NotesScreen() {
     const opts: Parameters<typeof listNotes>[0] = { query: q, onlyPublic: true };
     if (filter === 'completed') opts.completed = true;
     if (filter === 'pending') opts.completed = false;
-    if (filter === 'byDate') opts.dueDate = selectedDueDate.getTime();
+    if (filter === 'byDate') {
+      if (byDateMode === 'due') opts.dueDate = selectedDueDate.getTime();
+      else opts.createdDate = selectedDueDate.getTime();
+    }
     if (filter === 'overdue') opts.completed = false;
     let data = await listNotes(opts);
     if (filter === 'overdue') {
@@ -49,7 +54,7 @@ export default function NotesScreen() {
       data = data.filter(n => !n.completed && n.dueDate != null && dayStart(n.dueDate) < today);
     }
     setNotes(data);
-  }, [q, filter, selectedDueDate]);
+  }, [q, filter, selectedDueDate, byDateMode]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -233,6 +238,12 @@ export default function NotesScreen() {
         />
       ) : null}
 
+      {filter === 'byDate' ? (
+        <View style={{ paddingHorizontal: 12, marginBottom: 4 }}>
+          <DateViewModeToggle value={byDateMode} onChange={setByDateMode} />
+        </View>
+      ) : null}
+
       <View style={{ flex: 1, paddingHorizontal: 12, minHeight: 0 }}>
         {notes.length > 0 ? (
           <FlashList
@@ -251,7 +262,9 @@ export default function NotesScreen() {
               {filter === 'all'
                 ? 'No notes yet'
                 : filter === 'byDate'
-                  ? `No tasks for ${selectedDueDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`
+                  ? byDateMode === 'due'
+                    ? `No tasks due ${selectedDueDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`
+                    : `No notes created ${selectedDueDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`
                   : filter === 'overdue'
                     ? 'No overdue tasks'
                     : `No ${filter} tasks`}

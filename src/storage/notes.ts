@@ -30,6 +30,7 @@ export type NoteFilter = {
   onlyPrivate?: boolean;
   onlyPublic?: boolean;
   dueDate?: number | null;
+  createdDate?: number | null;
   completed?: boolean | null;
   hasReminder?: boolean;
 };
@@ -88,6 +89,10 @@ function applyFilters(all: Note[], opts?: NoteFilter): Note[] {
   if (opts?.dueDate != null) {
     const day = startOfDay(opts.dueDate);
     filtered = filtered.filter(n => n.dueDate != null && startOfDay(n.dueDate) === day);
+  }
+  if (opts?.createdDate != null) {
+    const day = startOfDay(opts.createdDate);
+    filtered = filtered.filter(n => startOfDay(n.createdAt) === day);
   }
   if (opts?.query) {
     const q = opts.query.toLowerCase();
