@@ -15,6 +15,7 @@ import {
   rescheduleAllReminders,
   setupNotificationCategories,
   resumeActiveAlarmIfNeeded,
+  registerAlarmBackgroundTask,
 } from '../src/services/notifications';
 
 export default function RootLayout() {
@@ -23,11 +24,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     (async () => {
-      await setupAndroidChannel();
-      await setupUpcomingAndroidChannel();
-      await setupNotificationCategories();
-      await requestNotificationPermissions();
-      await rescheduleAllReminders();
+    await setupAndroidChannel();
+    await setupUpcomingAndroidChannel();
+    await setupNotificationCategories();
+    await requestNotificationPermissions();
+    await registerAlarmBackgroundTask();
+    await rescheduleAllReminders();
     })();
 
     let cleanup = () => {};

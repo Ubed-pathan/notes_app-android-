@@ -1,9 +1,12 @@
 import { Platform } from 'react-native';
 import { upsertNote, getNote, listNotes } from '../storage/notes';
-import { getAlarmToneId, getSnoozeEnabled, getSnoozeMinutes, getAdvanceReminderEnabled, UPCOMING_REMINDER_MINUTES } from '../storage/reminderSettings';
-import { getAlarmTone, getNotificationSound, getReminderChannelId } from '../constants/alarmTones';
+import { getSnoozeEnabled, getSnoozeMinutes, getAdvanceReminderEnabled, UPCOMING_REMINDER_MINUTES } from '../storage/reminderSettings';
+import { getReminderChannelId } from '../constants/alarmTones';
+import { CUSTOM_ALARM_CHANNEL_ID, resolveAlarmNotificationSound } from './customAlarmSound';
 import { playAlarmRingtone, stopAlarmRingtone } from './alarmPlayback';
 import { clearAlarmAlert, showAlarmAlert } from './alarmAlertBus';
+export { registerAlarmBackgroundTask } from './alarmBackgroundTask';
+
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -19,15 +22,7 @@ export const UPCOMING_REMINDER_CHANNEL_ID = 'reminders-upcoming-v2';
 const NOTIFICATION_ACCENT = '#6750A4';
 const UPCOMING_REMINDER_MS = UPCOMING_REMINDER_MINUTES * 60 * 1000;
 
-export function isExpoGo(): boolean {
-  try {
-    const Constants = require('expo-constants').default;
-    const { ExecutionEnvironment } = require('expo-constants');
-    return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-  } catch {
-    return false;
-  }
-}
+import { isExpoGo } from '../utils/isExpoGo';
 
 async function getNotifications(): Promise<NotificationsModule | null> {
   // expo-notifications crashes in Expo Go on import (push token registration)
@@ -168,7 +163,7 @@ function buildUpcomingNotificationContent(
     title: `📌 ${UPCOMING_REMINDER_MINUTES} min until reminder`,
     subtitle: 'AL-KITAB',
     body: `${noteTitle}\n\n🕐 ${when}\n✨ Your alarm is coming soon — get ready!`,
-    sound: 'soft_chime.wav',
+    sound: 'classic_alarm.wav',
     color: NOTIFICATION_ACCENT,
     vibrate: [0, 180, 120, 180],
     data: { noteId, isUpcoming: true, noteTitle, reminderAt },
@@ -199,7 +194,7 @@ export async function setupUpcomingAndroidChannel(): Promise<string> {
     name: 'Early reminder',
     description: `Gentle heads-up ${UPCOMING_REMINDER_MINUTES} minutes before alarms`,
     importance: Notifications.AndroidImportance.HIGH,
-    sound: 'soft_chime.wav',
+    sound: 'classic_alarm.wav',
     vibrationPattern: [0, 180, 120, 180],
     enableVibrate: true,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
@@ -248,23 +243,25 @@ export async function snoozeNoteReminder(
   return scheduleNoteReminder(noteId, title, at);
 }
 
-export async function setupAndroidChannel(toneId?: import('../constants/alarmTones').AlarmToneId): Promise<string> {
+export async function setupAndroidChannel(): Promise<string> {
   const Notifications = await getNotifications();
-  if (!Notifications || Platform.OS !== 'android') return 'reminders-default';
+  if (!Notifications || Platform.OS !== 'android') return CUSTOM_ALARM_CHANNEL_ID;
 
-  const id = toneId ?? (await getAlarmToneId());
-  const tone = getAlarmTone(id);
-  const channelId = getReminderChannelId(id);
-  const sound = getNotificationSound(tone);
-  const channelLabel =
-    id === 'custom' ? 'Alarms · My tone' : id === 'default' ? 'Reminders' : `Alarms · ${tone.label}`;
+  const channelId = getReminderChannelId();
+  const sound = await resolveAlarmNotificationSound();
+
+  try {
+    await Notifications.deleteNotificationChannelAsync(channelId);
+  } catch {
+    // ignore
+  }
 
   await Notifications.setNotificationChannelAsync(channelId, {
-    name: channelLabel,
-    description: 'Note reminder alarms — uses alarm volume',
+    name: 'Alarms · My tone',
+    description: 'Note reminder alarms — uses your tone and alarm volume',
     importance: Notifications.AndroidImportance.MAX,
-    sound: typeof sound === 'string' ? sound : 'default',
-    vibrationPattern: [0, 600, 200, 600, 200, 600, 200, 600],
+    sound: typeof sound === 'string' ? sound : undefined,
+    vibrationPattern: [0, 800, 300, 800, 300, 800, 300, 800],
     enableVibrate: true,
     bypassDnd: true,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
@@ -314,10 +311,8 @@ export async function scheduleNoteReminder(
       note?.upcomingNotificationId,
     ]);
 
-    const toneId = await getAlarmToneId();
-    const tone = getAlarmTone(toneId);
-    const channelId = await setupAndroidChannel(toneId);
-    const sound = getNotificationSound(tone);
+    const channelId = await setupAndroidChannel();
+    const sound = await resolveAlarmNotificationSound();
     await setupNotificationCategories();
     await setupUpcomingAndroidChannel();
 
@@ -352,7 +347,7 @@ export async function scheduleNoteReminder(
       content: {
         title: '⏰ Alarm',
         body: noteTitle,
-        sound,
+        sound: sound ?? 'classic_alarm.wav',
         priority: Notifications.AndroidNotificationPriority.MAX,
         vibrate: [0, 600, 200, 600, 200, 600],
         color: NOTIFICATION_ACCENT,
@@ -396,19 +391,33 @@ export async function cancelNoteReminder(noteId: string): Promise<void> {
   });
 }
 
-/** Re-register all future reminders (e.g. after app restart or OS cleared alarms). */
+/** Re-register future reminders only when OS cleared them (e.g. after reboot). */
 export async function rescheduleAllReminders(): Promise<void> {
   const Notifications = await getNotifications();
   if (!Notifications) return;
   if (!(await requestNotificationPermissions())) return;
 
-  await setupAndroidChannel(await getAlarmToneId());
+  await setupAndroidChannel();
   await setupUpcomingAndroidChannel();
   const now = Date.now();
   const notes = await listNotes();
 
+  let scheduledIds = new Set<string>();
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    scheduledIds = new Set(scheduled.map(s => s.identifier));
+  } catch {
+    // If we cannot read scheduled notifications, reschedule everything below.
+  }
+
   for (const n of notes) {
     if (n.completed || !n.reminderAt || n.reminderAt <= now) continue;
+
+    const hasMain = Boolean(n.notificationId && scheduledIds.has(n.notificationId));
+    const upcomingOk =
+      !n.upcomingNotificationId || scheduledIds.has(n.upcomingNotificationId);
+    if (hasMain && upcomingOk) continue;
+
     await scheduleNoteReminder(n.id, n.title, n.reminderAt);
   }
 }
@@ -434,8 +443,7 @@ export async function handleAlarmNotification(
     notificationId: notification.request.identifier,
   });
 
-  const toneId = await getAlarmToneId();
-  await playAlarmRingtone(toneId);
+  await playAlarmRingtone();
 }
 
 /** When app returns to foreground, resume alarm if notification is still showing. */

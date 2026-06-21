@@ -1,28 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
-import { Button, Divider, IconButton, List, RadioButton, Text, useTheme } from 'react-native-paper';
-import { ALARM_TONES, AlarmToneId } from '../constants/alarmTones';
+import { Button, Divider, Text } from 'react-native-paper';
 import {
-  getAlarmToneId,
   getCustomAlarmTone,
   pickAndSaveCustomAlarmTone,
-  setAlarmToneId,
 } from '../storage/reminderSettings';
 import { rescheduleAllReminders } from '../services/notifications';
-import { previewAlarmRingtone, previewCustomAlarmTone, stopAlarmRingtone } from '../services/alarmPlayback';
+import { previewCustomAlarmTone, stopAlarmRingtone } from '../services/alarmPlayback';
+import { openBatterySettings, openExactAlarmSettings } from '../services/exactAlarm';
 import { SnoozeSettings } from './SnoozeSettings';
 import { AdvanceReminderSettings } from './AdvanceReminderSettings';
 
 export function AlarmRingtoneSettings() {
-  const theme = useTheme();
-  const [selected, setSelected] = useState<AlarmToneId>('classic_alarm');
   const [customName, setCustomName] = useState<string | null>(null);
-  const [previewing, setPreviewing] = useState<AlarmToneId | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [picking, setPicking] = useState(false);
 
   const load = useCallback(async () => {
-    const [id, custom] = await Promise.all([getAlarmToneId(), getCustomAlarmTone()]);
-    setSelected(id);
+    const custom = await getCustomAlarmTone();
     setCustomName(custom?.name ?? null);
   }, []);
 
@@ -35,7 +30,7 @@ export function AlarmRingtoneSettings() {
 
   const stopPreview = useCallback(async () => {
     await stopAlarmRingtone();
-    setPreviewing(null);
+    setPreviewing(false);
   }, []);
 
   const listenToCustomTone = useCallback(async () => {
@@ -44,72 +39,23 @@ export function AlarmRingtoneSettings() {
       return;
     }
 
-    if (previewing === 'custom') {
+    if (previewing) {
       await stopPreview();
       return;
     }
 
-    await stopPreview();
-    setPreviewing('custom');
+    setPreviewing(true);
     try {
       const sound = await previewCustomAlarmTone();
       if (!sound) {
-        setPreviewing(null);
+        setPreviewing(false);
         Alert.alert('Cannot play tone', 'The saved file was not found. Please choose it again.');
-        return;
       }
     } catch {
-      setPreviewing(null);
+      setPreviewing(false);
       Alert.alert('Playback failed', 'Could not play this audio file. Try MP3, WAV, or M4A.');
     }
   }, [customName, previewing, stopPreview]);
-
-  const previewTone = useCallback(
-    async (id: AlarmToneId) => {
-      if (id === 'default') return;
-      if (id === 'custom') {
-        await listenToCustomTone();
-        return;
-      }
-
-      if (previewing === id) {
-        await stopPreview();
-        return;
-      }
-
-      await stopPreview();
-      setPreviewing(id);
-      try {
-        const sound = await previewAlarmRingtone(id);
-        if (!sound) {
-          setPreviewing(null);
-          return;
-        }
-        sound.setOnPlaybackStatusUpdate(status => {
-          if (status.isLoaded && status.didJustFinish) {
-            stopPreview();
-          }
-        });
-      } catch {
-        setPreviewing(null);
-        Alert.alert('Preview failed', 'Could not play this tone.');
-      }
-    },
-    [listenToCustomTone, previewing, stopPreview]
-  );
-
-  const selectTone = useCallback(
-    async (id: AlarmToneId) => {
-      if (id === 'custom' && !customName) {
-        Alert.alert('Pick a tone first', 'Use “Choose audio file” to select your alarm sound.');
-        return;
-      }
-      setSelected(id);
-      await setAlarmToneId(id);
-      await rescheduleAllReminders();
-    },
-    [customName]
-  );
 
   const pickCustomTone = useCallback(async () => {
     setPicking(true);
@@ -117,10 +63,13 @@ export function AlarmRingtoneSettings() {
       const custom = await pickAndSaveCustomAlarmTone();
       if (!custom) return;
       setCustomName(custom.name);
-      setSelected('custom');
       await rescheduleAllReminders();
+      Alert.alert(
+        'Tone saved',
+        'Your alarm tone is set. Rebuild the APK (expo prebuild) so background ringing works on Android.'
+      );
     } catch {
-      Alert.alert('Import failed', 'Could not save that audio file. Try another format (MP3, WAV, M4A).');
+      Alert.alert('Import failed', 'Could not save that audio file. Try MP3, WAV, or M4A.');
     } finally {
       setPicking(false);
     }
@@ -128,62 +77,54 @@ export function AlarmRingtoneSettings() {
 
   return (
     <View>
-      <Text variant="bodySmall" style={{ opacity: 0.65, marginBottom: 8, paddingHorizontal: 4 }}>
-        Reminders ring as full-length alarms. Built-in tones play completely. Your own tone loops until you open or
-        snooze the alarm.
+      <Text variant="bodySmall" style={{ opacity: 0.65, marginBottom: 12, paddingHorizontal: 4 }}>
+        Reminders use your own audio file. It loops until you tap Stop or Snooze.
       </Text>
-      <RadioButton.Group onValueChange={v => selectTone(v as AlarmToneId)} value={selected}>
-        {ALARM_TONES.map((tone, index) => (
-          <View key={tone.id}>
-            {index > 0 ? <Divider style={{ opacity: 0.1 }} /> : null}
-            <List.Item
-              title={tone.id === 'custom' && customName ? `My tone · ${customName}` : tone.label}
-              description={
-                tone.id === 'custom' && customName
-                  ? 'Your chosen audio file'
-                  : tone.description
-              }
-              left={props => (
-                <List.Icon {...props} icon={tone.id === 'custom' ? 'music-box-outline' : 'alarm'} />
-              )}
-              onPress={() => selectTone(tone.id)}
-              right={() => (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {tone.id !== 'default' && tone.id !== 'custom' ? (
-                    <IconButton
-                      icon={previewing === tone.id ? 'stop' : 'play-circle-outline'}
-                      size={22}
-                      onPress={() => previewTone(tone.id)}
-                    />
-                  ) : null}
-                  <RadioButton value={tone.id} color={theme.colors.primary} />
-                </View>
-              )}
-            />
-            {tone.id === 'custom' ? (
-              <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}>
-                <Button
-                  mode="contained-tonal"
-                  icon="folder-music-outline"
-                  loading={picking}
-                  onPress={pickCustomTone}
-                >
-                  Choose audio file
-                </Button>
-                {customName ? (
-                  <Button
-                    mode="contained"
-                    icon={previewing === 'custom' ? 'stop' : 'volume-high'}
-                    onPress={listenToCustomTone}
-                  >
-                    {previewing === 'custom' ? 'Stop listening' : 'Listen to my tone'}
-                  </Button>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-        ))}
-      </RadioButton.Group>
+
+      <View style={{ paddingHorizontal: 4, paddingBottom: 12, gap: 8 }}>
+        <Text variant="titleSmall" style={{ fontWeight: '700' }}>
+          {customName ? `My tone · ${customName}` : 'My tone'}
+        </Text>
+        <Text variant="bodySmall" style={{ opacity: 0.6 }}>
+          {customName ? 'Tap below to change or listen' : 'Choose an audio file from your phone'}
+        </Text>
+
+        <Button
+          mode="contained-tonal"
+          icon="folder-music-outline"
+          loading={picking}
+          onPress={pickCustomTone}
+        >
+          {customName ? 'Change audio file' : 'Choose audio file'}
+        </Button>
+
+        {customName ? (
+          <Button
+            mode="contained"
+            icon={previewing ? 'stop' : 'volume-high'}
+            onPress={listenToCustomTone}
+          >
+            {previewing ? 'Stop listening' : 'Listen to my tone'}
+          </Button>
+        ) : null}
+      </View>
+
+      <Divider style={{ opacity: 0.1, marginVertical: 8 }} />
+
+      <Text variant="titleSmall" style={{ fontWeight: '700', marginBottom: 8, paddingHorizontal: 4 }}>
+        On-time alarms (Android)
+      </Text>
+      <Text variant="bodySmall" style={{ opacity: 0.65, marginBottom: 8, paddingHorizontal: 4 }}>
+        Allow exact alarms and disable battery optimization so reminders ring at the right time with sound.
+      </Text>
+      <View style={{ paddingHorizontal: 4, gap: 8, marginBottom: 8 }}>
+        <Button mode="outlined" icon="alarm-check" onPress={() => openExactAlarmSettings()}>
+          Allow exact alarms
+        </Button>
+        <Button mode="outlined" icon="battery-heart-outline" onPress={() => openBatterySettings()}>
+          Battery optimization
+        </Button>
+      </View>
 
       <SnoozeSettings />
       <AdvanceReminderSettings />

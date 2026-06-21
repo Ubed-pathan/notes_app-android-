@@ -14,17 +14,15 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withCustomAlarmSound.js",
       [
         "expo-notifications",
         {
           "icon": "./assets/icon-1024.png",
           "color": "#6750A4",
-          "defaultChannel": "reminders-v2-classic_alarm",
+          "defaultChannel": "alkitab-my-tone-v3",
           "sounds": [
-            "./assets/sounds/classic_alarm.wav",
-            "./assets/sounds/soft_chime.wav",
-            "./assets/sounds/digital_beep.wav",
-            "./assets/sounds/gentle_bell.wav"
+            "./assets/sounds/classic_alarm.wav"
           ]
         }
       ]

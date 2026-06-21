@@ -2,8 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { AlarmToneId, DEFAULT_ALARM_TONE_ID } from '../constants/alarmTones';
-
-const ALARM_TONE_KEY = '@alkitab/alarm-tone';
 const CUSTOM_ALARM_KEY = '@alkitab/custom-alarm-tone';
 const SNOOZE_ENABLED_KEY = '@alkitab/snooze-enabled';
 const SNOOZE_MINUTES_KEY = '@alkitab/snooze-minutes';
@@ -22,26 +20,11 @@ export type CustomAlarmTone = {
 const CUSTOM_ALARM_DIR = `${FileSystem.documentDirectory}alarm-tones/`;
 
 export async function getAlarmToneId(): Promise<AlarmToneId> {
-  try {
-    const raw = await AsyncStorage.getItem(ALARM_TONE_KEY);
-    if (
-      raw === 'default' ||
-      raw === 'classic_alarm' ||
-      raw === 'soft_chime' ||
-      raw === 'digital_beep' ||
-      raw === 'gentle_bell' ||
-      raw === 'custom'
-    ) {
-      return raw;
-    }
-  } catch {
-    // ignore
-  }
   return DEFAULT_ALARM_TONE_ID;
 }
 
-export async function setAlarmToneId(id: AlarmToneId): Promise<void> {
-  await AsyncStorage.setItem(ALARM_TONE_KEY, id);
+export async function setAlarmToneId(_id: AlarmToneId): Promise<void> {
+  // Only custom tone is supported.
 }
 
 export async function getCustomAlarmTone(): Promise<CustomAlarmTone | null> {
@@ -78,11 +61,19 @@ export async function pickAndSaveCustomAlarmTone(): Promise<CustomAlarmTone | nu
   }
 
   const dest = `${CUSTOM_ALARM_DIR}user_alarm${ext}`;
-  await FileSystem.copyAsync({ from: asset.uri, to: dest });
+  try {
+    await FileSystem.copyAsync({ from: asset.uri, to: dest });
+  } catch {
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    await FileSystem.writeAsStringAsync(dest, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  }
 
   const custom: CustomAlarmTone = { uri: dest, name: asset.name };
   await AsyncStorage.setItem(CUSTOM_ALARM_KEY, JSON.stringify(custom));
-  await setAlarmToneId('custom');
   return custom;
 }
 

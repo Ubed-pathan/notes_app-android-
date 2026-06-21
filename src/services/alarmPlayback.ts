@@ -1,13 +1,12 @@
 import { Audio, AVPlaybackSource } from 'expo-av';
-import { AlarmToneId, getAlarmTone } from '../constants/alarmTones';
-import { getAlarmToneId, getCustomAlarmTone } from '../storage/reminderSettings';
+import { getCustomAlarmTone } from '../storage/reminderSettings';
 
 let activeSound: Audio.Sound | null = null;
 let alarmMaxTimer: ReturnType<typeof setTimeout> | null = null;
 let alarmReplayStop = false;
 
-/** Built-in tones replay for up to 60s unless Stop/Snooze is tapped. */
-const BUILTIN_ALARM_MAX_MS = 60_000;
+/** Custom tone replays for up to 3 minutes unless Stop/Snooze is tapped. */
+const CUSTOM_ALARM_MAX_MS = 180_000;
 
 function clearAlarmMaxTimer(): void {
   if (alarmMaxTimer) {
@@ -16,17 +15,11 @@ function clearAlarmMaxTimer(): void {
   }
 }
 
-async function resolvePlaybackSource(toneId: AlarmToneId): Promise<AVPlaybackSource | null> {
-  if (toneId === 'custom') {
-    const custom = await getCustomAlarmTone();
-    if (!custom?.uri) return null;
-    const uri = custom.uri.startsWith('file://') ? custom.uri : `file://${custom.uri}`;
-    return { uri };
-  }
-
-  const tone = getAlarmTone(toneId);
-  if (tone.preview) return tone.preview;
-  return null;
+async function resolvePlaybackSource(): Promise<AVPlaybackSource | null> {
+  const custom = await getCustomAlarmTone();
+  if (!custom?.uri) return null;
+  const uri = custom.uri.startsWith('file://') ? custom.uri : `file://${custom.uri}`;
+  return { uri };
 }
 
 export async function stopAlarmRingtone(): Promise<void> {
@@ -42,10 +35,10 @@ export async function stopAlarmRingtone(): Promise<void> {
   activeSound = null;
 }
 
-async function playBuiltinAlarmOnce(id: AlarmToneId): Promise<void> {
+async function playCustomAlarmOnce(): Promise<void> {
   if (alarmReplayStop) return;
 
-  const source = await resolvePlaybackSource(id);
+  const source = await resolvePlaybackSource();
   if (!source) return;
 
   if (activeSound) {
@@ -66,19 +59,14 @@ async function playBuiltinAlarmOnce(id: AlarmToneId): Promise<void> {
   activeSound = sound;
   sound.setOnPlaybackStatusUpdate(status => {
     if (status.isLoaded && status.didJustFinish && !alarmReplayStop) {
-      void playBuiltinAlarmOnce(id);
+      void playCustomAlarmOnce();
     }
   });
 }
 
-/**
- * Play alarm when a reminder fires.
- * - Custom tone: loops until Stop or Snooze.
- * - Built-in tones: replay for up to 60 seconds, then auto-stop.
- */
-export async function playAlarmRingtone(toneId?: AlarmToneId): Promise<void> {
-  const id = toneId ?? (await getAlarmToneId());
-  const source = await resolvePlaybackSource(id);
+/** Play custom alarm — loops until Stop/Snooze or max duration. */
+export async function playAlarmRingtone(): Promise<void> {
+  const source = await resolvePlaybackSource();
   if (!source) return;
 
   await stopAlarmRingtone();
@@ -92,21 +80,12 @@ export async function playAlarmRingtone(toneId?: AlarmToneId): Promise<void> {
     playThroughEarpieceAndroid: false,
   });
 
-  if (id === 'custom') {
-    const { sound } = await Audio.Sound.createAsync(
-      source,
-      { shouldPlay: true, isLooping: true, volume: 1 }
-    );
-    activeSound = sound;
-    return;
-  }
-
   clearAlarmMaxTimer();
   alarmMaxTimer = setTimeout(() => {
     void stopAlarmRingtone();
-  }, BUILTIN_ALARM_MAX_MS);
+  }, CUSTOM_ALARM_MAX_MS);
 
-  await playBuiltinAlarmOnce(id);
+  await playCustomAlarmOnce();
 }
 
 export async function previewCustomAlarmTone(): Promise<Audio.Sound | null> {
@@ -127,26 +106,6 @@ export async function previewCustomAlarmTone(): Promise<Audio.Sound | null> {
     { uri },
     { shouldPlay: true, isLooping: true, volume: 1 }
   );
-
-  activeSound = sound;
-  return sound;
-}
-
-export async function previewAlarmRingtone(toneId: AlarmToneId): Promise<Audio.Sound | null> {
-  if (toneId === 'custom') return previewCustomAlarmTone();
-
-  await stopAlarmRingtone();
-
-  const source = await resolvePlaybackSource(toneId);
-  if (!source) return null;
-
-  await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-
-  const { sound } = await Audio.Sound.createAsync(source, {
-    shouldPlay: true,
-    isLooping: false,
-    volume: 1,
-  });
 
   activeSound = sound;
   return sound;

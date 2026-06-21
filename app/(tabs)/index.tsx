@@ -1,9 +1,9 @@
 import { useRouter, useFocusEffect } from 'expo-router';
-import { View, NativeSyntheticEvent, NativeScrollEvent, Pressable, ScrollView, Platform } from 'react-native';
+import { View, Pressable, ScrollView, Platform } from 'react-native';
 import { FAB, Searchbar, Text, useTheme, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { Note, listNotes, deleteNote, togglePin, setPrivate, toggleComplete, startOfDay as dayStart } from '../../src/storage/notes';
@@ -36,8 +36,6 @@ export default function NotesScreen() {
   const [selectedDueDate, setSelectedDueDate] = useState(() => startOfDay(new Date()));
   const [byDateMode, setByDateMode] = useState<DateViewMode>('due');
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [triggeredPrivate, setTriggeredPrivate] = useState(false);
-  const hasScrolledRef = useRef(false);
 
   const load = useCallback(async () => {
     const opts: Parameters<typeof listNotes>[0] = { query: q, onlyPublic: true };
@@ -100,21 +98,6 @@ export default function NotesScreen() {
     />
   ), [router, notes]);
 
-  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    if (y > 50) hasScrolledRef.current = true;
-    if (!triggeredPrivate && y > 300) {
-      setTriggeredPrivate(true);
-      router.push('/private/notes');
-    }
-  };
-
-  const onEndReached = () => {
-    if (triggeredPrivate || !hasScrolledRef.current) return;
-    setTriggeredPrivate(true);
-    router.push('/private/notes');
-  };
-
   const filters: { key: FilterMode; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; wide?: boolean }[] = [
     { key: 'all', label: 'All', icon: 'format-list-bulleted' },
     { key: 'pinned', label: 'Pinned', icon: 'pin' },
@@ -157,7 +140,10 @@ export default function NotesScreen() {
     <Screen style={{ backgroundColor: theme.colors.background }}>
       <AppTopBar
         title={
-          <Pressable onLongPress={() => router.push('/private/notes')}>
+          <Pressable
+            delayLongPress={900}
+            onLongPress={() => router.push('/private')}
+          >
             <Text variant="titleLarge" style={{ fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>
               AL-KITAB
             </Text>
@@ -255,9 +241,6 @@ export default function NotesScreen() {
             data={notes}
             renderItem={renderItem}
             keyExtractor={i => i.id}
-            onScroll={onScroll}
-            onEndReached={onEndReached}
-            onEndReachedThreshold={0.2}
             contentContainerStyle={{ paddingBottom: listPaddingBottom, paddingTop: 4 }}
           />
         ) : (
