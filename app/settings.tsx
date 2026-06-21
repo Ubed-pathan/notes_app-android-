@@ -70,7 +70,7 @@ export default function SettingsScreen() {
         <AboutSection
           isDark={isDark}
           displayName={displayName}
-          version={Constants?.expoConfig?.version || Constants?.manifest?.version || '2.0.0'}
+          version={Constants?.expoConfig?.version ?? '2.0.0'}
         />
       </ScrollView>
     </View>

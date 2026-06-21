@@ -5,8 +5,7 @@ import { getReminderChannelId } from '../constants/alarmTones';
 import { CUSTOM_ALARM_CHANNEL_ID, resolveAlarmNotificationSound } from './customAlarmSound';
 import { playAlarmRingtone, stopAlarmRingtone } from './alarmPlayback';
 import { clearAlarmAlert, showAlarmAlert } from './alarmAlertBus';
-export { registerAlarmBackgroundTask } from './alarmBackgroundTask';
-
+import { isExpoGo } from '../utils/isExpoGo';
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -21,8 +20,6 @@ export type ScheduleResult =
 export const UPCOMING_REMINDER_CHANNEL_ID = 'reminders-upcoming-v2';
 const NOTIFICATION_ACCENT = '#6750A4';
 const UPCOMING_REMINDER_MS = UPCOMING_REMINDER_MINUTES * 60 * 1000;
-
-import { isExpoGo } from '../utils/isExpoGo';
 
 async function getNotifications(): Promise<NotificationsModule | null> {
   // expo-notifications crashes in Expo Go on import (push token registration)
@@ -528,4 +525,15 @@ export function reminderEnvironmentHint(): string | null {
     return 'Alarms need a dev build. Run: npm run android (Expo Go cannot play custom alarm tones).';
   }
   return null;
+}
+
+/** Lazy-loads alarm background task — skipped in Expo Go. */
+export async function registerAlarmBackgroundTask(): Promise<void> {
+  if (isExpoGo()) return;
+  try {
+    const { registerAlarmBackgroundTask: register } = await import('./alarmBackgroundTask');
+    await register();
+  } catch {
+    // Unavailable in Expo Go
+  }
 }
